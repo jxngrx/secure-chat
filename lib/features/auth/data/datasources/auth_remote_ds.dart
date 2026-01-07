@@ -1,25 +1,47 @@
 import '../../../../core/network/api_client.dart';
 
 class AuthRemoteDataSource {
-  AuthRemoteDataSource._();
+  AuthRemoteDataSource(this._apiClient);
 
-  static final AuthRemoteDataSource instance = AuthRemoteDataSource._();
+  final ApiClient _apiClient;
 
-  final ApiClient _apiClient = ApiClient.instance;
-
-  // TODO: Implement authentication remote data source methods
-  Future<Map<String, dynamic>> sendOtp(String phoneNumber) async {
-    // Placeholder implementation
-    throw UnimplementedError('AuthRemoteDataSource.sendOtp not implemented');
+  Future<void> requestOtp(String phoneNumber) async {
+    await _apiClient.post('/auth/request-otp', {
+      'phone': phoneNumber,
+    });
   }
 
-  Future<Map<String, dynamic>> verifyOtp(String phoneNumber, String otp) async {
-    // Placeholder implementation
-    throw UnimplementedError('AuthRemoteDataSource.verifyOtp not implemented');
+  Future<Map<String, dynamic>> verifyOtp({
+    required String phoneNumber,
+    required String otp,
+    String? deviceId,
+    Map<String, dynamic>? location,
+  }) async {
+    final payload = <String, dynamic>{
+      'phone': phoneNumber,
+      'otp': otp,
+    };
+
+    if (deviceId != null) {
+      payload['deviceId'] = deviceId;
+    }
+    if (location != null) {
+      payload['location'] = location;
+    }
+
+    final response = await _apiClient.post('/auth/verify-otp', payload);
+    return response['data'] as Map<String, dynamic>?
+        ?? <String, dynamic>{};
   }
 
-  Future<Map<String, dynamic>> setUsername(String username) async {
-    // Placeholder implementation
-    throw UnimplementedError('AuthRemoteDataSource.setUsername not implemented');
+  Future<Map<String, dynamic>> updateUsername(String username) async {
+    final response = await _apiClient.put(
+      '/users/username',
+      {
+        'username': username,
+      },
+    );
+    return response['data'] as Map<String, dynamic>?
+        ?? <String, dynamic>{};
   }
 }

@@ -1,35 +1,76 @@
-class UserModel {
-  final String id;
-  final String phoneNumber;
-  final String? username;
-  final String? displayName;
-  final String? avatarUrl;
+import '../../domain/entities/user_entity.dart';
 
-  UserModel({
+class UserModel {
+  const UserModel({
     required this.id,
-    required this.phoneNumber,
+    required this.phone,
     this.username,
-    this.displayName,
-    this.avatarUrl,
+    this.email,
+    this.authMethod,
+    this.isOnline,
+    this.lastSeen,
+    this.createdAt,
+    this.updatedAt,
   });
+
+  final String id;
+  final String phone;
+  final String? username;
+  final String? email;
+  final String? authMethod;
+  final bool? isOnline;
+  final DateTime? lastSeen;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'phoneNumber': phoneNumber,
+      'phone': phone,
       'username': username,
-      'displayName': displayName,
-      'avatarUrl': avatarUrl,
+      'email': email,
+      'authMethod': authMethod,
+      'isOnline': isOnline,
+      'lastSeen': lastSeen?.toIso8601String(),
+      'createdAt': createdAt?.toIso8601String(),
+      'updatedAt': updatedAt?.toIso8601String(),
     };
+  }
+
+  UserEntity toEntity() {
+    return UserEntity(
+      id: id,
+      phone: phone,
+      username: username,
+      email: email,
+      authMethod: authMethod,
+      isOnline: isOnline,
+      lastSeen: lastSeen,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+    );
   }
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
-      id: json['id'] as String,
-      phoneNumber: json['phoneNumber'] as String,
+      id: (json['id'] ?? json['_id'] ?? '') as String,
+      phone: (json['phone'] ?? json['phoneNumber'] ?? '') as String,
       username: json['username'] as String?,
-      displayName: json['displayName'] as String?,
-      avatarUrl: json['avatarUrl'] as String?,
+      email: json['email'] as String?,
+      authMethod: json['authMethod'] as String?,
+      isOnline: json['isOnline'] as bool?,
+      lastSeen: _tryParseDate(json['lastSeen']),
+      createdAt: _tryParseDate(json['createdAt']),
+      updatedAt: _tryParseDate(json['updatedAt']),
     );
+  }
+
+  static DateTime? _tryParseDate(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+    if (value is String && value.isNotEmpty) {
+      return DateTime.tryParse(value);
+    }
+    return null;
   }
 }

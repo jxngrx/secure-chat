@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'app.dart';
 import 'core/config/app_config.dart';
 import 'core/config/env.dart';
 import 'core/config/flavor.dart';
+import 'di/injection_container.dart';
 
 Future<void> bootstrap() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,8 +17,12 @@ Future<void> bootstrap() async {
   );
 
   // Initialize dependency injection
-  // TODO: Initialize DI container
+  await InjectionContainer.init();
 
   // Run the app
-  runApp(const App());
+  runApp(
+    const ProviderScope(
+      child: App(),
+    ),
+  );
 }
