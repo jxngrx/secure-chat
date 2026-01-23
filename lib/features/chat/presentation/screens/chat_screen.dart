@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/date_utils.dart' as AppDateUtils;
 import '../../data/models/chat_item_model.dart';
 import '../../data/models/message_model.dart';
+import '../notifiers/chat_controller.dart';
+import '../../../message/presentation/notifiers/message_controller.dart';
+import '../../../message/domain/entities/message_entity.dart';
+import '../../../../di/providers.dart';
 
 class _MessageListItem {
   final bool isDateSeparator;
@@ -15,7 +20,7 @@ class _MessageListItem {
   });
 }
 
-class ChatScreen extends StatefulWidget {
+class ChatScreen extends ConsumerStatefulWidget {
   final String chatId;
   final String? chatName;
   final String? chatAvatar;
@@ -30,47 +35,46 @@ class ChatScreen extends StatefulWidget {
   });
 
   @override
-  State<ChatScreen> createState() => _ChatScreenState();
+  ConsumerState<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends ConsumerState<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  List<MessageModel> _messages = []; // Empty by default
-  final String _currentUserId = 'current_user'; // Placeholder
 
   @override
   void initState() {
     super.initState();
-    // For demo, populate with sample messages
-    _messages = _getSampleMessages();
+    // Load messages when screen opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(messageControllerProvider.notifier).loadMessages(widget.chatId);
+      ref.read(chatControllerProvider.notifier).joinChat(widget.chatId);
+    });
+    // Listen to text changes to update mic/send icon
+    _messageController.addListener(() {
+      setState(() {});
+    });
   }
 
   @override
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
+    ref.read(chatControllerProvider.notifier).leaveChat(widget.chatId);
     super.dispose();
   }
 
-  void _handleSendMessage() {
+  Future<void> _handleSendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
-    setState(() {
-      _messages.add(
-        MessageModel(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          chatId: widget.chatId,
-          senderId: _currentUserId,
-          content: text,
-          type: MessageType.text,
-          timestamp: DateTime.now(),
-          isSent: true,
-          isRead: false,
-        ),
-      );
-    });
+    final messageController = ref.read(messageControllerProvider.notifier);
+    await messageController.sendMessage(
+      chatId: widget.chatId,
+      type: 'text',
+      content: text,
+      useSocket: true, // Use Socket.IO for real-time
+    );
 
     _messageController.clear();
     _scrollToBottom();
@@ -92,7 +96,13 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final backgroundColor = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
-    final hasMessages = _messages.isNotEmpty;
+
+    // Watch message state
+    final messageState = ref.watch(messageControllerProvider);
+    final messages = messageState.messages[widget.chatId] ?? [];
+    final hasMessages = messages.isNotEmpty;
+    final isSending = messageState.sending[widget.chatId] ?? false;
+
     final chatName = widget.chatName ?? 'Chat';
     final chatAvatar = widget.chatAvatar;
     final isOnline = widget.isOnline ?? false;
@@ -243,11 +253,11 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
 
-          // Video call button
+          // Call button (replaced video call)
           IconButton(
-            onPressed: () {}, // TODO: Start video call
+            onPressed: () {}, // TODO: Start voice call
             icon: Icon(
-              Icons.videocam,
+              Icons.call,
               color: AppColors.primary,
               size: 26,
             ),
@@ -258,12 +268,19 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildMessagesList(bool isDark) {
+    final messageState = ref.watch(messageControllerProvider);
+    final messages = messageState.messages[widget.chatId] ?? [];
+
+    // Get current user ID from auth state
+    final authState = ref.watch(authControllerProvider);
+    final currentUserId = authState.user?.id ?? '';
+
     // Build a list of items (messages and date separators)
     final List<_MessageListItem> items = [];
 
-    for (int i = 0; i < _messages.length; i++) {
+    for (int i = 0; i < messages.length; i++) {
       // Add date separator if needed
-      if (i == 0 || _shouldShowDateSeparator(i)) {
+      if (i == 0 || _shouldShowDateSeparatorForEntity(messages, i)) {
         items.add(_MessageListItem(isDateSeparator: true, messageIndex: i));
       }
       // Add the message
@@ -277,16 +294,76 @@ class _ChatScreenState extends State<ChatScreen> {
       itemBuilder: (context, index) {
         final item = items[index];
         if (item.isDateSeparator) {
-          return _buildDateSeparator(_messages[item.messageIndex].timestamp, isDark);
+          return _buildDateSeparator(messages[item.messageIndex].timestamp, isDark);
         }
 
-        final message = _messages[item.messageIndex];
-        final isCurrentUser = message.senderId == _currentUserId;
-        final showAvatar = !isCurrentUser && _shouldShowAvatar(item.messageIndex);
+        final message = messages[item.messageIndex];
+        final isCurrentUser = message.senderId == currentUserId;
+        final showAvatar = !isCurrentUser && _shouldShowAvatarForEntity(messages, item.messageIndex);
 
-        return _buildMessageBubble(message, isDark, isCurrentUser, showAvatar);
+        return _buildMessageBubbleFromEntity(message, isDark, isCurrentUser, showAvatar);
       },
     );
+  }
+
+  bool _shouldShowDateSeparatorForEntity(List<MessageEntity> messages, int index) {
+    if (index == 0) return true;
+    if (index >= messages.length) return false;
+    final current = messages[index].timestamp;
+    final previous = messages[index - 1].timestamp;
+    final currentDate = DateTime(current.year, current.month, current.day);
+    final previousDate = DateTime(previous.year, previous.month, previous.day);
+    return currentDate != previousDate;
+  }
+
+  bool _shouldShowAvatarForEntity(List<MessageEntity> messages, int index) {
+    if (index == messages.length - 1) return true;
+    if (index >= messages.length) return false;
+    final current = messages[index];
+    final next = index < messages.length - 1 ? messages[index + 1] : null;
+    if (next == null) return true;
+    return current.senderId != next.senderId ||
+        (index < messages.length - 1 && messages[index].timestamp.difference(messages[index + 1].timestamp).inMinutes > 5);
+  }
+
+  Widget _buildMessageBubbleFromEntity(MessageEntity message, bool isDark, bool isCurrentUser, bool showAvatar) {
+    // Convert MessageEntity to MessageModel for display
+    final messageModel = MessageModel(
+      id: message.id,
+      chatId: message.chatId,
+      senderId: message.senderId,
+      senderName: message.senderName,
+      senderAvatar: message.senderAvatar,
+      content: message.content,
+      type: _messageTypeFromString(message.type),
+      timestamp: message.timestamp,
+      isSent: message.status != 'sending',
+      isRead: message.status == 'read',
+      mediaUrl: message.mediaUrl,
+      mediaSize: message.mediaSize,
+      voiceDuration: message.voiceDuration,
+    );
+    return _buildMessageBubble(messageModel, isDark, isCurrentUser, showAvatar);
+  }
+
+  MessageType _messageTypeFromString(String type) {
+    switch (type.toLowerCase()) {
+      case 'text':
+        return MessageType.text;
+      case 'image':
+        return MessageType.image;
+      case 'video':
+        return MessageType.video;
+      case 'voice':
+        return MessageType.voice;
+      case 'file':
+        return MessageType.file;
+      case 'missedcall':
+      case 'missed_call':
+        return MessageType.missedCall;
+      default:
+        return MessageType.text;
+    }
   }
 
   Widget _buildMessageBubble(MessageModel message, bool isDark, bool isCurrentUser, bool showAvatar) {
@@ -359,7 +436,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (message.type == MessageType.image && message.mediaUrl != null)
+                      if (message.type == MessageType.missedCall)
+                        _buildMissedCallMessage(message, isCurrentUser)
+                      else if (message.type == MessageType.image && message.mediaUrl != null)
                         _buildImageMessage(message, isCurrentUser)
                       else if (message.type == MessageType.voice)
                         _buildVoiceMessage(message, isCurrentUser)
@@ -459,6 +538,28 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
         ],
+      ],
+    );
+  }
+
+  Widget _buildMissedCallMessage(MessageModel message, bool isCurrentUser) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.call_missed,
+          size: 18,
+          color: isCurrentUser ? Colors.white : Colors.red,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          'Missed call',
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+            color: isCurrentUser ? Colors.white : Colors.red,
+          ),
+        ),
       ],
     );
   }
@@ -873,25 +974,6 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  bool _shouldShowDateSeparator(int messageIndex) {
-    if (messageIndex == 0) return true;
-    if (messageIndex >= _messages.length) return false;
-    final current = _messages[messageIndex].timestamp;
-    final previous = _messages[messageIndex - 1].timestamp;
-    return current.day != previous.day ||
-        current.month != previous.month ||
-        current.year != previous.year;
-  }
-
-  bool _shouldShowAvatar(int messageIndex) {
-    if (messageIndex == 0) return true;
-    if (messageIndex >= _messages.length) return false;
-    final current = _messages[messageIndex];
-    final previous = _messages[messageIndex - 1];
-    return current.senderId != previous.senderId ||
-        _messages[messageIndex].timestamp.difference(_messages[messageIndex - 1].timestamp).inMinutes > 5;
-  }
-
   Color _getAvatarColor(String name) {
     final colors = [
       const Color(0xFF6366F1),
@@ -913,63 +995,4 @@ class _ChatScreenState extends State<ChatScreen> {
     return name.substring(0, name.length > 2 ? 2 : name.length).toUpperCase();
   }
 
-  List<MessageModel> _getSampleMessages() {
-    final now = DateTime.now();
-    return [
-      MessageModel(
-        id: '1',
-        chatId: widget.chatId,
-        senderId: 'other_user',
-        senderName: 'Alice Johnson',
-        senderAvatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBN2ZZNdjR8QBKJidg2BG7-7nPr3dPdJ_oU7x29CpMSsQFhI6CEBGFm1IcM0bkA1SvXlw96vD_FcVSsUJa_PXTP5JLavPShajkOgKvf3b70EEguxihmSNQNd7bazZpXXx-pTzhvVF5_ziswCXzhFVcSFhEs501Fg68WzP221gRjdQob1A2Ho2BZ9IvtSK2RnuxwlptBEkLhTtHLZ-Xhrxn3ogJZP3MDvSJAkPqv7W__PssCEWfC0DyhifwZ1Ht2mfbUMMQ9XN132wvR',
-        content: 'Hey! Did you get the files for the project?',
-        type: MessageType.text,
-        timestamp: now.subtract(const Duration(days: 1, hours: 2)),
-        isSent: false,
-      ),
-      MessageModel(
-        id: '2',
-        chatId: widget.chatId,
-        senderId: _currentUserId,
-        content: 'Yes, looking at them now. The assets are clean.',
-        type: MessageType.text,
-        timestamp: now.subtract(const Duration(days: 1, hours: 1, minutes: 57)),
-        isSent: true,
-        isRead: true,
-      ),
-      MessageModel(
-        id: '3',
-        chatId: widget.chatId,
-        senderId: 'other_user',
-        senderName: 'Alice Johnson',
-        content: null,
-        type: MessageType.voice,
-        timestamp: now.subtract(const Duration(hours: 3, minutes: 19)),
-        voiceDuration: 15,
-        isSent: false,
-      ),
-      MessageModel(
-        id: '4',
-        chatId: widget.chatId,
-        senderId: _currentUserId,
-        content: 'This layout concept looks fantastic.',
-        type: MessageType.image,
-        mediaUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCQo5iSgqJrWz4081L6_gIFX5ae0xcWSWQgVAq5Dv3y-tBcEKp-Fjzl6l0S_zybfkdFG93gQ0DiOxwIkMif3y_yIQMGrjIeZCA7dCemLQRdCl-6JzNUaGbd7_g6LtWIQXwmH65M-2bynUZUJphCGLqNZcniB99N4lKdoClfFPYn_D8VNQTKL0K7Mkx2RivXWV42fJc6UhJY0wstMi_O3AuDDwijT-MOetn_V38ukL-dccdFX642HugXzIAYRLY5P0i6d0hsEBXTaM_-',
-        mediaSize: '1.2 MB',
-        timestamp: now.subtract(const Duration(hours: 3, minutes: 17)),
-        isSent: true,
-        isRead: true,
-      ),
-      MessageModel(
-        id: '5',
-        chatId: widget.chatId,
-        senderId: _currentUserId,
-        content: "Let's deploy.",
-        type: MessageType.text,
-        timestamp: now.subtract(const Duration(hours: 3, minutes: 16)),
-        isSent: true,
-        isRead: false,
-      ),
-    ];
-  }
 }

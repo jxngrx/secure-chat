@@ -14,6 +14,7 @@ import '../../features/chat/data/models/file_model.dart';
 import '../../features/call/presentation/screens/calls_screen.dart';
 import '../../features/contacts/presentation/screens/contacts_list_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
+import '../../features/user/presentation/screens/user_search_screen.dart';
 
 class AppRouter {
   AppRouter._();
@@ -89,6 +90,10 @@ class AppRouter {
       case RouteNames.contacts:
         return MaterialPageRoute(
           builder: (_) => const ContactsListScreen(),
+        );
+      case RouteNames.userSearch:
+        return MaterialPageRoute(
+          builder: (_) => const UserSearchScreen(),
         );
       case RouteNames.fileViewer:
         final file = settings.arguments;

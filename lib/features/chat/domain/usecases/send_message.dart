@@ -1,4 +1,4 @@
-import '../entities/message_entity.dart';
+import '../../../message/domain/entities/message_entity.dart';
 import '../repositories/chat_repository.dart';
 
 class SendMessageUseCase {

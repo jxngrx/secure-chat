@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/routing/route_names.dart';
 import '../../../../core/utils/date_utils.dart' as AppDateUtils;
 import '../../data/models/call_item_model.dart';
+import '../notifiers/call_controller.dart';
+import '../../domain/entities/call_entity.dart';
 
-class CallsScreen extends StatefulWidget {
+class CallsScreen extends ConsumerStatefulWidget {
   const CallsScreen({super.key});
 
   @override
-  State<CallsScreen> createState() => _CallsScreenState();
+  ConsumerState<CallsScreen> createState() => _CallsScreenState();
 }
 
-class _CallsScreenState extends State<CallsScreen> {
+class _CallsScreenState extends ConsumerState<CallsScreen> {
   final TextEditingController _searchController = TextEditingController();
   int _selectedFilter = 0; // 0: All, 1: Missed
   int _selectedTab = 1; // 0: Contacts, 1: Calls, 2: Chats, 3: Settings
@@ -21,7 +24,10 @@ class _CallsScreenState extends State<CallsScreen> {
   @override
   void initState() {
     super.initState();
-    _calls = _getSampleCalls();
+    // Load calls from backend
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(callControllerProvider.notifier).loadCallHistory();
+    });
   }
 
   @override
@@ -53,9 +59,22 @@ class _CallsScreenState extends State<CallsScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final backgroundColor = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
+    final callState = ref.watch(callControllerProvider);
+
+    // Convert CallEntity to CallItemModel for display
+    final allCalls = callState.calls.map((call) {
+      return CallItemModel(
+        id: call.id,
+        name: 'User ${call.receiverId}', // TODO: Get actual user name
+        timestamp: call.createdAt,
+        type: _mapCallStatusToType(call.status),
+        direction: call.callerId == 'current_user' ? CallDirection.outgoing : CallDirection.incoming,
+      );
+    }).toList();
+
     final filteredCalls = _selectedFilter == 0
-        ? _calls
-        : _calls.where((call) => call.type == CallType.missed).toList();
+        ? allCalls
+        : allCalls.where((call) => call.type == CallType.missed).toList();
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -68,9 +87,11 @@ class _CallsScreenState extends State<CallsScreen> {
 
             // Main Content
             Expanded(
-              child: filteredCalls.isEmpty
-                  ? _buildEmptyState(isDark)
-                  : _buildCallsList(filteredCalls, isDark),
+              child: callState.isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : filteredCalls.isEmpty
+                      ? _buildEmptyState(isDark)
+                      : _buildCallsList(filteredCalls, isDark),
             ),
           ],
         ),
@@ -548,56 +569,16 @@ class _CallsScreenState extends State<CallsScreen> {
     return name.substring(0, name.length > 2 ? 2 : name.length).toUpperCase();
   }
 
-  List<CallItemModel> _getSampleCalls() {
-    final now = DateTime.now();
-    return [
-      CallItemModel(
-        id: '1',
-        name: 'Alice Murray',
-        avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCowm6U36O-nl9Tfqo5dAmPxtzu-FaNQPW2sl5SX436t4VhJTzJMNXIWSLwYVFLK0oKx1JwgebY_jEIsvoox7gcKU8acd4bpC5xgSrtA0lPhtehWWNJlaqvd5k3e_3BRXAjAiKCYzIrqs6FSijFNWiOXX2l03oYiOqwT5oOxZ0JbNXuclGbvRMph5rysz_hGa7J8Q8YGvZJBgjRALUjS2yzb3T6eIovzJCN0B8DFyE1TGPyGuiVFpdDjzAREB8UzRIBvHPhXofiVt2V',
-        timestamp: now.subtract(const Duration(hours: 2)),
-        type: CallType.missed,
-        direction: CallDirection.incoming,
-      ),
-      CallItemModel(
-        id: '2',
-        name: 'Daniel K.',
-        timestamp: now.subtract(const Duration(days: 1)),
-        type: CallType.outgoing,
-        direction: CallDirection.outgoing,
-      ),
-      CallItemModel(
-        id: '3',
-        name: 'Sophie Chen',
-        avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCx-zlC_JnzW-IRbVN2Gmt1CrYAfRKafp1HESIhADFktKdQqAy6Ztz7Uf9e9g5oR9MUSaI2zZziyAqpZi76bMpnDkufQPgX2S52YO0g1Tj1VlYiLeLFAfyGwtfVdPIqPhU4i1EwjIV93zUIZRjcqCD3fNnigJfLwlbtL_uAqsWRk1Xf8kUJwxYF-EtwYbNt7znc4C2KJ4ejpvkkBA52AuwTuEbvrWojLCbmk2HSKeOZTX2jaP_XmqEfrV_fzvVKOacgh-UQzr_ChFoF',
-        timestamp: now.subtract(const Duration(days: 2)),
-        type: CallType.incoming,
-        direction: CallDirection.incoming,
-      ),
-      CallItemModel(
-        id: '4',
-        name: 'Mom',
-        timestamp: now.subtract(const Duration(days: 3)),
-        type: CallType.incoming,
-        direction: CallDirection.incoming,
-        isVideo: true,
-      ),
-      CallItemModel(
-        id: '5',
-        name: 'James Wilson',
-        avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBkPU9Wz0de9lKztNMR9fEdTnfl-khdSp6t7GULPpIo5WcTI9uxwGzIAobPMWh96yLLgdO8JhHBo4l2B3gLTNH0KvP132UFs-LHKb3wqBgOnik7Ma4LDv-k_MavGEzjG5FWjaa-kVK2jorparqBYIDwWDWJ2y_nmf0MoT5nldWNq5jyc3MAbkefK_5JqlBKk4gGSjrbHAIt1Vvf0n2Gscs7tXEa7rKZm2jWXFTNEV0aNf3TjtT9vKGEL39GZozPLwJJIHacZFjUYBg4',
-        timestamp: now.subtract(const Duration(days: 4)),
-        type: CallType.missed,
-        direction: CallDirection.incoming,
-        missedCount: 2,
-      ),
-      CallItemModel(
-        id: '6',
-        name: 'Unknown',
-        timestamp: now.subtract(const Duration(days: 7)),
-        type: CallType.outgoing,
-        direction: CallDirection.outgoing,
-      ),
-    ];
+  CallType _mapCallStatusToType(String status) {
+    switch (status.toLowerCase()) {
+      case 'rejected':
+      case 'missed':
+        return CallType.missed;
+      case 'ended':
+      case 'answered':
+        return CallType.incoming;
+      default:
+        return CallType.incoming;
+    }
   }
 }

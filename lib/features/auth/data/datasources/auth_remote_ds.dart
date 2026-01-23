@@ -44,4 +44,28 @@ class AuthRemoteDataSource {
     return response['data'] as Map<String, dynamic>?
         ?? <String, dynamic>{};
   }
+
+  /// Google OAuth authentication
+  Future<Map<String, dynamic>> googleAuth({
+    required String idToken,
+    required String phone,
+    String? deviceId,
+    Map<String, dynamic>? location,
+  }) async {
+    final payload = <String, dynamic>{
+      'idToken': idToken,
+      'phone': phone,
+    };
+
+    if (deviceId != null) {
+      payload['deviceId'] = deviceId;
+    }
+    if (location != null) {
+      payload['location'] = location;
+    }
+
+    final response = await _apiClient.post('/auth/google', payload);
+    return response['data'] as Map<String, dynamic>?
+        ?? <String, dynamic>{};
+  }
 }

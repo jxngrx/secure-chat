@@ -9,9 +9,7 @@ class SecureStorage {
     encryptedSharedPreferences: true,
   );
 
-  static const _iosOptions = IOSOptions(
-    accessibility: KeychainAccessibility.afterFirstUnlock,
-  );
+  static const _iosOptions = IOSOptions();
 
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 

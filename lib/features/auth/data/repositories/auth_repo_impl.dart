@@ -5,6 +5,7 @@ import '../../../../core/storage/secure_storage.dart';
 import '../../domain/entities/auth_result_entity.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../domain/repositories/auth_repository.dart';
+import '../../../session/domain/entities/session_entity.dart';
 import '../datasources/auth_remote_ds.dart';
 import '../models/user_model.dart';
 

@@ -1,5 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/services/background_service_manager.dart';
+import '../../../../core/utils/logger.dart';
+import '../../../../di/injection_container.dart';
 import '../../../device/domain/entities/device_entity.dart';
 import '../../../session/domain/entities/session_entity.dart';
 import '../../domain/repositories/auth_repository.dart';
@@ -49,6 +52,17 @@ class AuthController extends StateNotifier<AuthState> {
         user: result.user,
         session: result.session,
       );
+
+      // Initialize background services after successful authentication
+      try {
+        final backgroundServiceManager =
+            InjectionContainer.resolve<BackgroundServiceManager>();
+        await backgroundServiceManager.initializeServices();
+      } catch (e) {
+        // Log error but don't fail authentication
+        // Background services can be initialized later
+        Logger.w('Error initializing background services: $e');
+      }
     } catch (error) {
       state = state.copyWith(
         status: AuthStatus.error,

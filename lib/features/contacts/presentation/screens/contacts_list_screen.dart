@@ -1,24 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/routing/route_names.dart';
 import '../../data/models/contact_model.dart';
+import '../notifiers/contact_controller.dart';
+import '../../domain/entities/contact_entity.dart';
 
-class ContactsListScreen extends StatefulWidget {
+class ContactsListScreen extends ConsumerStatefulWidget {
   const ContactsListScreen({super.key});
 
   @override
-  State<ContactsListScreen> createState() => _ContactsListScreenState();
+  ConsumerState<ContactsListScreen> createState() => _ContactsListScreenState();
 }
 
-class _ContactsListScreenState extends State<ContactsListScreen> {
+class _ContactsListScreenState extends ConsumerState<ContactsListScreen> {
   final TextEditingController _searchController = TextEditingController();
   int _selectedTab = 0; // 0: Contacts, 1: Calls, 2: Chats, 3: Settings
-  List<ContactModel> _contacts = [];
 
   @override
   void initState() {
     super.initState();
-    _contacts = _getSampleContacts();
+    // Load contacts from backend
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(contactControllerProvider.notifier).loadContacts();
+    });
   }
 
   @override
@@ -50,6 +55,8 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final backgroundColor = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
+    final contactState = ref.watch(contactControllerProvider);
+    final filteredContacts = _getFilteredContacts(contactState.contacts);
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -62,15 +69,27 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
 
             // Main Content
             Expanded(
-              child: _contacts.isEmpty
-                  ? _buildEmptyState(isDark)
-                  : _buildContactsList(isDark),
+              child: contactState.isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : filteredContacts.isEmpty
+                      ? _buildEmptyState(isDark)
+                      : _buildContactsList(filteredContacts, isDark),
             ),
           ],
         ),
       ),
       bottomNavigationBar: _buildBottomNavigation(isDark),
     );
+  }
+
+  List<ContactEntity> _getFilteredContacts(List<ContactEntity> contacts) {
+    final query = _searchController.text.toLowerCase().trim();
+    if (query.isEmpty) return contacts;
+    return contacts.where((contact) {
+      final phone = contact.phone.toLowerCase();
+      final username = contact.username?.toLowerCase() ?? '';
+      return phone.contains(query) || username.contains(query);
+    }).toList();
   }
 
   Widget _buildHeader(bool isDark) {
@@ -137,17 +156,17 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
     );
   }
 
-  Widget _buildContactsList(bool isDark) {
+  Widget _buildContactsList(List<ContactEntity> contacts, bool isDark) {
     return ListView.builder(
       padding: const EdgeInsets.only(bottom: 20),
-      itemCount: _contacts.length,
+      itemCount: contacts.length,
       itemBuilder: (context, index) {
-        return _buildContactItem(_contacts[index], isDark);
+        return _buildContactItem(contacts[index], isDark);
       },
     );
   }
 
-  Widget _buildContactItem(ContactModel contact, bool isDark) {
+  Widget _buildContactItem(ContactEntity contact, bool isDark) {
     return InkWell(
       onTap: () {}, // TODO: Show contact details or start chat
       child: Container(
@@ -173,7 +192,7 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    contact.name,
+                    contact.username ?? contact.phone,
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -185,7 +204,7 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    contact.phoneNumber ?? contact.username ?? '',
+                    contact.phone,
                     style: TextStyle(
                       fontSize: 14,
                       color: isDark
@@ -203,7 +222,8 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
     );
   }
 
-  Widget _buildAvatar(ContactModel contact, bool isDark) {
+  Widget _buildAvatar(ContactEntity contact, bool isDark) {
+    final displayName = contact.username ?? contact.phone;
     return Stack(
       children: [
         Container(
@@ -211,42 +231,18 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
           height: 56,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: contact.avatarUrl == null
-                ? _getAvatarColor(contact.name)
-                : null,
+            color: _getAvatarColor(displayName),
           ),
-          child: contact.avatarUrl != null
-              ? ClipOval(
-                  child: Image.network(
-                    contact.avatarUrl!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: _getAvatarColor(contact.name),
-                        child: Center(
-                          child: Text(
-                            _getInitials(contact.name),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                )
-              : Center(
-                  child: Text(
-                    _getInitials(contact.name),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
+          child: Center(
+            child: Text(
+              _getInitials(displayName),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
         ),
         if (contact.isOnline)
           Positioned(
@@ -376,31 +372,4 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
     return name.substring(0, name.length > 2 ? 2 : name.length).toUpperCase();
   }
 
-  List<ContactModel> _getSampleContacts() {
-    return [
-      ContactModel(
-        id: '1',
-        name: 'Sarah Wilson',
-        avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDwRjtZelyiooIlhUMl69vx9RiiUPpIUwEffDUPxz0PMeHKM7E2QmNOooziumWHMzQ1f9S0lffQEAfORSCgxIMs61kOT0-7koH8Qkh_85N2ppNPMV8wSOEV1_lPNbywttyWoOabPXikuuwg29eZiKk8n-VtwwUfN8OEXfYy5mBVoVDTg3J2PS_p11e3gfShsiwxB7q0XilUmkbl7rgICp_MSpmCiwJ86N_271SVeb16edWE24p7mvGWkf9vnAHCIgBg2ixDs4ikge0m',
-        phoneNumber: '+1 (555) 123-4567',
-        isOnline: true,
-      ),
-      ContactModel(
-        id: '2',
-        name: 'John Doe',
-        phoneNumber: '+1 (555) 234-5678',
-      ),
-      ContactModel(
-        id: '3',
-        name: 'Alice Johnson',
-        username: '@alicejohnson',
-        isOnline: true,
-      ),
-      ContactModel(
-        id: '4',
-        name: 'Mike Chen',
-        phoneNumber: '+1 (555) 345-6789',
-      ),
-    ];
-  }
 }

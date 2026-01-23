@@ -32,4 +32,7 @@ class RouteNames {
 
   // Profile routes
   static const String profile = '/profile';
+
+  // User search routes
+  static const String userSearch = '/user-search';
 }

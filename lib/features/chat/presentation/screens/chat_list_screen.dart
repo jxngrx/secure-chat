@@ -1,27 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/routing/route_names.dart';
 import '../../../../core/utils/date_utils.dart' as AppDateUtils;
 import '../../data/models/chat_item_model.dart';
 import '../widgets/empty_state.dart';
+import '../notifiers/chat_controller.dart';
+import '../../domain/entities/chat_entity.dart';
+import '../../../../di/providers.dart';
 
-class ChatListScreen extends StatefulWidget {
+class ChatListScreen extends ConsumerStatefulWidget {
   const ChatListScreen({super.key});
 
   @override
-  State<ChatListScreen> createState() => _ChatListScreenState();
+  ConsumerState<ChatListScreen> createState() => _ChatListScreenState();
 }
 
-class _ChatListScreenState extends State<ChatListScreen> {
+class _ChatListScreenState extends ConsumerState<ChatListScreen> {
   final TextEditingController _searchController = TextEditingController();
-  late final List<ChatItemModel> _chats; // Will be initialized in initState
   int _selectedTab = 2; // 0: Contacts, 1: Calls, 2: Chats, 3: Settings
 
   @override
   void initState() {
     super.initState();
-    _chats = _getSampleChats();
+    // Load chats from backend
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(chatControllerProvider.notifier).loadChats();
+    });
   }
 
   @override
@@ -31,7 +37,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   void _handleStartMessaging() {
-    // TODO: Navigate to new chat or contacts screen
+    Navigator.pushNamed(context, RouteNames.userSearch);
   }
 
   void _handleChatTap(ChatItemModel chat) {
@@ -48,7 +54,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   void _handleNewChat() {
-    // TODO: Navigate to new chat screen
+    Navigator.pushNamed(context, RouteNames.userSearch);
   }
 
   void _handleTabChange(int index) {
@@ -74,7 +80,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final backgroundColor = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
-    final hasChats = _chats.isNotEmpty;
+
+    // Watch chat state
+    final chatState = ref.watch(chatControllerProvider);
+    final chats = chatState.chats;
+    final hasChats = chats.isNotEmpty;
+    final isLoading = chatState.isLoading;
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -87,9 +98,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
             // Main Content
             Expanded(
-              child: hasChats
-                  ? _buildChatList(isDark)
-                  : _buildEmptyState(isDark),
+              child: isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : hasChats
+                      ? _buildChatList(isDark, chats)
+                      : _buildEmptyState(isDark),
             ),
           ],
         ),
@@ -190,15 +203,26 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
-  Widget _buildChatList(bool isDark) {
-    // For demo, let's create some sample chats
-    final sampleChats = _getSampleChats();
+  Widget _buildChatList(bool isDark, List<ChatEntity> chats) {
+    // Convert ChatEntity to ChatItemModel for display
+    final chatItems = chats.map<ChatItemModel>((chat) {
+      return ChatItemModel(
+        id: chat.id,
+        name: chat.name ?? 'Unknown',
+        avatarUrl: null, // Will be set from participant data if available
+        lastMessage: null, // Will be set from lastMessage if available
+        lastMessageTime: chat.lastMessageTime,
+        unreadCount: 0, // Can be calculated from messages
+        isOnline: false, // Can be set from participant data
+        isGroup: chat.isGroup,
+      );
+    }).toList();
 
     return ListView.builder(
       padding: const EdgeInsets.only(bottom: 100),
-      itemCount: sampleChats.length,
+      itemCount: chatItems.length,
       itemBuilder: (context, index) {
-        return _buildChatItem(sampleChats[index], isDark);
+        return _buildChatItem(chatItems[index], isDark);
       },
     );
   }
@@ -588,61 +612,4 @@ class _ChatListScreenState extends State<ChatListScreen> {
     return name.substring(0, name.length > 2 ? 2 : name.length).toUpperCase();
   }
 
-  List<ChatItemModel> _getSampleChats() {
-    return [
-      ChatItemModel(
-        id: '1',
-        name: 'Sarah Wilson',
-        avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDwRjtZelyiooIlhUMl69vx9RiiUPpIUwEffDUPxz0PMeHKM7E2QmNOooziumWHMzQ1f9S0lffQEAfORSCgxIMs61kOT0-7koH8Qkh_85N2ppNPMV8wSOEV1_lPNbywttyWoOabPXikuuwg29eZiKk8n-VtwwUfN8OEXfYy5mBVoVDTg3J2PS_p11e3gfShsiwxB7q0XilUmkbl7rgICp_MSpmCiwJ86N_271SVeb16edWE24p7mvGWkf9vnAHCIgBg2ixDs4ikge0m',
-        lastMessage: 'Hey! Are we still on for lunch today?',
-        lastMessageTime: DateTime.now().subtract(const Duration(hours: 2)),
-        unreadCount: 2,
-        isOnline: true,
-      ),
-      ChatItemModel(
-        id: '2',
-        name: 'John Doe',
-        lastMessage: 'I sent you the files via email.',
-        lastMessageTime: DateTime.now().subtract(const Duration(days: 1)),
-        lastMessageType: MessageType.text,
-      ),
-      ChatItemModel(
-        id: '3',
-        name: 'Project Alpha Team',
-        lastMessage: 'Has anyone seen the latest updates?',
-        lastMessageTime: DateTime.now().subtract(const Duration(days: 2)),
-        lastMessageSender: 'Mike',
-        isGroup: true,
-        isMuted: true,
-      ),
-      ChatItemModel(
-        id: '4',
-        name: 'Support Team',
-        avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBrhgx2uS6Ju0u1dKE18Pyld7cerT0do0G76M8wEPkwje5b4RB6aAko6er06Cgti8Rv6NMXhDxSp5mgQ1lrMckt0RbWZYzU504oVxU-yv_6_qUYb1lMmzi8vdA5Bj1S23dzFzz-KKAEVetRRf2sdvKJKvi_SfpA-n5g1G4y1u9XPi5JgJ1rdvP-ofFTF6zsPm6TlvEh1YrjGRxQuSEwKTqjeRg2Tmj-36ARmR4qwPS1F3g8x_uJYwJ8P-uJTm3yyv1MJZDwI23dMwlV',
-        lastMessage: 'Your ticket #8842 has been resolved.',
-        lastMessageTime: DateTime.now().subtract(const Duration(days: 3)),
-        isVerified: true,
-      ),
-      ChatItemModel(
-        id: '5',
-        name: 'Alex Morgan',
-        lastMessage: 'Missed call',
-        lastMessageTime: DateTime.now().subtract(const Duration(days: 4)),
-        lastMessageType: MessageType.missedCall,
-      ),
-      ChatItemModel(
-        id: '6',
-        name: 'Saved Messages',
-        lastMessage: 'IMG_20230521.jpg',
-        lastMessageTime: DateTime(2024, 1, 24),
-        lastMessageType: MessageType.image,
-      ),
-      ChatItemModel(
-        id: '7',
-        name: 'Bella Swan',
-        lastMessage: 'Can you send me the details?',
-        lastMessageTime: DateTime(2024, 1, 22),
-      ),
-    ];
-  }
 }

@@ -6,6 +6,12 @@ import '../features/auth/presentation/notifiers/auth_controller.dart';
 import '../features/auth/presentation/notifiers/auth_state.dart';
 import 'injection_container.dart';
 
+// Export chat and message providers (must be before declarations)
+export '../features/chat/presentation/providers/chat_providers.dart';
+export '../features/message/presentation/providers/message_providers.dart';
+export '../features/chat/presentation/notifiers/chat_controller.dart';
+export '../features/message/presentation/notifiers/message_controller.dart';
+
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return InjectionContainer.resolve<AuthRepository>();
 });
