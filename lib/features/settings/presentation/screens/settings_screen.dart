@@ -31,6 +31,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isLoading = true;
   bool _isLoadingDevices = false;
   bool _isLoadingSessions = false;
+  bool _isDevicesExpanded = false; // Track if devices section is expanded
   
   Map<String, dynamic>? _userProfile;
   List<Map<String, dynamic>> _devices = [];
@@ -457,43 +458,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               : _buildInitialsAvatar(username),
                         ),
                       ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: GestureDetector(
-                          onTap: () {
-                            // TODO: Navigate to edit profile for avatar
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Avatar editing coming soon'),
-                              ),
-                            );
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
-                                width: 4,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.2),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.add_a_photo,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -581,9 +545,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 12),
                   
                   // Devices Section
-                  _buildSectionHeader(isDark, 'Devices', _devices.length),
-                  const SizedBox(height: 8),
-                  _buildDevicesSection(isDark, surfaceColor),
+                  _buildDevicesSectionHeader(isDark),
+                  if (_isDevicesExpanded) ...[
+                    const SizedBox(height: 8),
+                    _buildDevicesSection(isDark, surfaceColor),
+                  ],
                   const SizedBox(height: 24),
                   
                   // Log Out Button
@@ -697,6 +663,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDevicesSectionHeader(bool isDark) {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _isDevicesExpanded = !_isDevicesExpanded;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDark : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Text(
+              'Devices',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '(${_devices.length})',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: isDark ? Colors.white70 : Colors.black54,
+              ),
+            ),
+            const Spacer(),
+            AnimatedRotation(
+              turns: _isDevicesExpanded ? 0.5 : 0,
+              duration: const Duration(milliseconds: 200),
+              child: Icon(
+                Icons.chevron_right,
+                color: isDark ? Colors.white70 : Colors.black54,
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -44,4 +44,9 @@ class ChatRemoteDataSource {
     });
     return response['data'] as Map<String, dynamic>? ?? {};
   }
+
+  /// Delete chat (soft delete - hides from user)
+  Future<void> deleteChat(String chatId) async {
+    await _apiClient.delete('/chats/$chatId');
+  }
 }

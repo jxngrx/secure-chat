@@ -1,13 +1,18 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/storage_keys.dart';
 import '../../../../core/routing/route_names.dart';
 import '../../../../core/utils/date_utils.dart' as AppDateUtils;
+import '../../../../core/storage/local_storage.dart';
+import '../../../../di/injection_container.dart';
 import '../../data/models/chat_item_model.dart';
 import '../widgets/empty_state.dart';
 import '../notifiers/chat_controller.dart';
 import '../../domain/entities/chat_entity.dart';
+import '../../../message/presentation/notifiers/message_controller.dart';
 import '../../../../di/providers.dart';
 
 class ChatListScreen extends ConsumerStatefulWidget {
@@ -27,14 +32,31 @@ class ChatListScreen extends ConsumerStatefulWidget {
 class _ChatListScreenState extends ConsumerState<ChatListScreen> {
   final TextEditingController _searchController = TextEditingController();
   int _selectedTab = 2; // 0: Contacts, 1: Calls, 2: Chats, 3: Settings
+  String? _currentUserId;
 
   @override
   void initState() {
     super.initState();
+    _loadCurrentUserId();
     // Load chats from backend
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(chatControllerProvider.notifier).loadChats();
     });
+  }
+
+  Future<void> _loadCurrentUserId() async {
+    try {
+      final localStorage = InjectionContainer.resolve<LocalStorage>();
+      final userProfileJson = await localStorage.read(StorageKeys.userProfile);
+      if (userProfileJson != null && userProfileJson.isNotEmpty) {
+        final userProfile = jsonDecode(userProfileJson) as Map<String, dynamic>;
+        setState(() {
+          _currentUserId = userProfile['id'] as String?;
+        });
+      }
+    } catch (e) {
+      // Silently fail
+    }
   }
 
   @override
@@ -100,12 +122,14 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     final isLoading = chatState.isLoading;
 
     final safeBottom = MediaQuery.of(context).padding.bottom;
-    final fabBottomPadding = widget.showBottomNav ? safeBottom + 80 : safeBottom + 16;
+    // Position FAB lower in the corner
+    final fabBottomPadding = widget.showBottomNav ? safeBottom + 120 : safeBottom + 20;
 
     return Scaffold(
       backgroundColor: backgroundColor,
       body: SafeArea(
         bottom: false,
+        top: true,
         child: Column(
           children: [
             // Header
@@ -113,7 +137,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
 
             // Main Content
             Expanded(
-              child: isLoading
+              child: isLoading && chats.isEmpty
                   ? const Center(child: CircularProgressIndicator())
                   : hasChats
                       ? _buildChatList(isDark, chats)
@@ -138,7 +162,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
   Widget _buildHeader(bool isDark) {
     final backgroundColor = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 48, 16, 12),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
       decoration: BoxDecoration(
         color: backgroundColor.withOpacity(0.95),
         border: Border(
@@ -203,13 +227,17 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                   fontSize: 14,
                   color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
                 ),
-                prefixIcon: Icon(
-                  Icons.search,
-                  size: 20,
-                  color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                prefixIcon: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Icon(
+                    Icons.search,
+                    size: 20,
+                    color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                  ),
                 ),
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                isDense: true,
               ),
             ),
           ),
@@ -219,17 +247,49 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
   }
 
   Widget _buildChatList(bool isDark, List<ChatEntity> chats) {
+    // Get messages from message controller to calculate unread count
+    final messageState = ref.watch(messageControllerProvider);
+    
     // Convert ChatEntity to ChatItemModel for display
     final chatItems = chats.map<ChatItemModel>((chat) {
+      // Extract last message content and type
+      String? lastMessageContent;
+      MessageType? lastMessageType;
+      String? lastMessageSender;
+      
+      if (chat.lastMessage != null) {
+        final lastMsg = chat.lastMessage!;
+        lastMessageContent = lastMsg['content'] as String?;
+        final msgType = lastMsg['type'] as String? ?? 'text';
+        lastMessageType = _messageTypeFromString(msgType);
+        
+        // For group chats, get sender name
+        if (chat.isGroup && lastMsg['sender'] != null) {
+          final sender = lastMsg['sender'] as Map<String, dynamic>?;
+          lastMessageSender = sender?['username'] as String? ?? sender?['phone'] as String?;
+        }
+      }
+
+      // Calculate unread count from messages if available
+      int unreadCount = chat.unreadCount ?? 0;
+      if (unreadCount == 0 && _currentUserId != null) {
+        final chatMessages = messageState.messages[chat.id] ?? [];
+        unreadCount = chatMessages.where((msg) {
+          return msg.senderId != _currentUserId && msg.status != 'read';
+        }).length;
+      }
+
       return ChatItemModel(
         id: chat.id,
         name: chat.name ?? 'Unknown',
         avatarUrl: null, // Will be set from participant data if available
-        lastMessage: null, // Will be set from lastMessage if available
+        lastMessage: lastMessageContent,
         lastMessageTime: chat.lastMessageTime,
-        unreadCount: 0, // Can be calculated from messages
+        unreadCount: unreadCount,
         isOnline: false, // Can be set from participant data
         isGroup: chat.isGroup,
+        lastMessageSender: lastMessageSender,
+        lastMessageType: lastMessageType,
       );
     }).toList();
 
@@ -303,50 +363,57 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                           ],
                         ),
                       ),
-                      if (lastMessageTime != null)
-                        Text(
-                          lastMessageTime,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: chat.unreadCount > 0
-                                ? AppColors.primary
-                                : (isDark
-                                    ? AppColors.textSecondaryDark
-                                    : AppColors.textSecondaryLight),
-                            fontWeight: chat.unreadCount > 0
-                                ? FontWeight.w500
-                                : FontWeight.normal,
-                          ),
-                        ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (lastMessageTime != null)
+                            Text(
+                              lastMessageTime,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: chat.unreadCount > 0
+                                    ? AppColors.primary
+                                    : (isDark
+                                        ? AppColors.textSecondaryDark
+                                        : AppColors.textSecondaryLight),
+                                fontWeight: chat.unreadCount > 0
+                                    ? FontWeight.w500
+                                    : FontWeight.normal,
+                              ),
+                            ),
+                          if (chat.unreadCount > 0) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: chat.unreadCount > 99 ? 6 : 8,
+                                vertical: 2,
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 20,
+                                minHeight: 20,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  chat.unreadCount > 99 ? '99+' : '${chat.unreadCount}',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildLastMessage(chat, isDark),
-                      ),
-                      if (chat.unreadCount > 0)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            '${chat.unreadCount}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
+                  _buildLastMessage(chat, isDark),
                 ],
               ),
             ),
@@ -589,6 +656,26 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
         ),
       ),
     );
+  }
+
+  MessageType _messageTypeFromString(String type) {
+    switch (type.toLowerCase()) {
+      case 'text':
+        return MessageType.text;
+      case 'image':
+        return MessageType.image;
+      case 'video':
+        return MessageType.video;
+      case 'voice':
+        return MessageType.voice;
+      case 'file':
+        return MessageType.file;
+      case 'missedcall':
+      case 'missed_call':
+        return MessageType.missedCall;
+      default:
+        return MessageType.text;
+    }
   }
 
   String _formatLastMessageTime(DateTime time) {

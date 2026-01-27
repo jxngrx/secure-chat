@@ -77,11 +77,22 @@ class _UserSearchScreenState extends ConsumerState<UserSearchScreen> {
 
   Future<void> _startChat(UserEntity user) async {
     try {
+      // Show loading indicator
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Starting chat...'),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+
       final chatController = ref.read(chatControllerProvider.notifier);
       final chat = await chatController.createOrGetChat(user.id);
 
       if (mounted && chat != null) {
-        Navigator.pushReplacementNamed(
+        // Use pushNamed instead of pushReplacementNamed so user can go back
+        Navigator.pushNamed(
           context,
           RouteNames.chat,
           arguments: {
@@ -91,6 +102,15 @@ class _UserSearchScreenState extends ConsumerState<UserSearchScreen> {
             'isOnline': user.isOnline ?? false,
           },
         );
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to create chat. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -98,6 +118,7 @@ class _UserSearchScreenState extends ConsumerState<UserSearchScreen> {
           SnackBar(
             content: Text('Error starting chat: ${e.toString()}'),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
           ),
         );
       }

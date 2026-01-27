@@ -14,6 +14,7 @@ class MessageModel {
   final String? mediaUrl;
   final String? mediaSize; // For images/files
   final int? voiceDuration; // For voice messages in seconds
+  final bool? isDeleted; // Whether message is deleted for current user
 
   MessageModel({
     required this.id,
@@ -29,6 +30,7 @@ class MessageModel {
     this.mediaUrl,
     this.mediaSize,
     this.voiceDuration,
+    this.isDeleted,
   });
 
   Map<String, dynamic> toJson() {

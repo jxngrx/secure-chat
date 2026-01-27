@@ -207,6 +207,17 @@ class ChatController extends StateNotifier<ChatState> {
   void leaveChat(String chatId) {
     _socketDataSource.leaveChat(chatId);
   }
+
+  Future<void> deleteChat(String chatId) async {
+    try {
+      await _repository.deleteChat(chatId);
+      // Reload chats to remove the deleted one
+      await loadChats();
+    } catch (e) {
+      Logger.e('Error deleting chat', e);
+      rethrow;
+    }
+  }
 }
 
 /// Chat controller provider

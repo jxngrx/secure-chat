@@ -7,6 +7,7 @@ import '../core/services/device_info_service.dart';
 import '../core/services/device_registration_service.dart';
 import '../core/services/location_service.dart';
 import '../core/services/contact_service.dart';
+import '../core/services/contact_sync_service.dart';
 import '../core/services/background_service_manager.dart';
 import '../core/storage/local_storage.dart';
 import '../core/storage/secure_storage.dart';
@@ -80,6 +81,10 @@ class InjectionContainer {
 
     if (!_getIt.isRegistered<ContactService>()) {
       _getIt.registerLazySingleton<ContactService>(() => ContactService.instance);
+    }
+
+    if (!_getIt.isRegistered<ContactSyncService>()) {
+      _getIt.registerLazySingleton<ContactSyncService>(() => ContactSyncService.instance);
     }
 
     if (!_getIt.isRegistered<SocketClient>()) {

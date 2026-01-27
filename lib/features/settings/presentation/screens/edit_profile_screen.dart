@@ -356,90 +356,33 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget _buildAvatarSection(bool isDark, Color surfaceColor) {
     return Column(
       children: [
-        GestureDetector(
-          onTap: _pickImage,
-          child: Stack(
-            children: [
-              Container(
-                width: 128,
-                height: 128,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isDark ? surfaceColor : Colors.white,
-                    width: 4,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 20,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: ClipOval(
-                  child: _selectedImage != null
-                      ? Image.file(
-                          _selectedImage!,
-                          fit: BoxFit.cover,
-                        )
-                      : _selectedImageBytes != null
-                          ? Image.memory(
-                              _selectedImageBytes!,
-                              fit: BoxFit.cover,
-                            )
-                          : _currentAvatarUrl != null && _currentAvatarUrl!.isNotEmpty
-                              ? Image.network(
-                                  _currentAvatarUrl!,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return _buildInitialsAvatar(_usernameController.text);
-                                  },
-                                )
-                              : _buildInitialsAvatar(_usernameController.text),
-                ),
-              ),
-              Positioned(
-                bottom: 0,
-                right: 0,
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
-                      width: 4,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.photo_camera,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
+        Container(
+          width: 128,
+          height: 128,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: isDark ? surfaceColor : Colors.white,
+              width: 4,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 20,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 16),
-        GestureDetector(
-          onTap: _pickImage,
-          child: Text(
-            'Change Photo',
-            style: TextStyle(
-              color: AppColors.primary,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
+          child: ClipOval(
+            child: _currentAvatarUrl != null && _currentAvatarUrl!.isNotEmpty
+                ? Image.network(
+                    _currentAvatarUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return _buildInitialsAvatar(_usernameController.text);
+                    },
+                  )
+                : _buildInitialsAvatar(_usernameController.text),
           ),
         ),
       ],

@@ -1,8 +1,12 @@
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/repositories/message_repository.dart';
 import '../../domain/entities/message_entity.dart';
 import '../../../chat/data/datasources/chat_socket_ds.dart';
 import '../../../../core/utils/logger.dart';
+import '../../../../core/constants/storage_keys.dart';
+import '../../../../core/storage/local_storage.dart';
+import '../../../../di/injection_container.dart';
 import '../providers/message_providers.dart';
 
 class MessageState {
@@ -43,6 +47,70 @@ class MessageController extends StateNotifier<MessageState> {
   final ChatSocketDataSource _socketDataSource;
 
   void _setupSocketListeners() {
+    // Listen for new messages (from other users or our own messages via broadcast)
+    _socketDataSource.onNewMessage((data) {
+      try {
+        final message = MessageEntity(
+          id: data['id'] as String? ?? '',
+          chatId: data['chatId'] as String? ?? '',
+          senderId: data['sender'] != null
+              ? (data['sender'] as Map<String, dynamic>)['id'] as String? ?? ''
+              : '',
+          senderName: data['sender'] != null
+              ? (data['sender'] as Map<String, dynamic>)['username'] as String?
+              : null,
+          content: data['content'] as String?,
+          type: data['type'] as String? ?? 'text',
+          timestamp: data['createdAt'] != null
+              ? DateTime.tryParse(data['createdAt'] as String) ?? DateTime.now()
+              : DateTime.now(),
+          status: 'delivered',
+        );
+
+        final currentMessages = Map<String, List<MessageEntity>>.from(state.messages);
+        final chatMessages = List<MessageEntity>.from(currentMessages[message.chatId] ?? []);
+
+        // Check if message already exists by ID
+        final existingByIdIndex = chatMessages.indexWhere((m) => m.id == message.id);
+        if (existingByIdIndex != -1) {
+          // Message already exists, just update it
+          chatMessages[existingByIdIndex] = message;
+          currentMessages[message.chatId] = chatMessages;
+          state = state.copyWith(messages: currentMessages);
+          return;
+        }
+
+        // Check if this is our own message that we sent optimistically
+        // Match by content, type, and timestamp (within 5 seconds)
+        int? optimisticIndex;
+        for (int i = 0; i < chatMessages.length; i++) {
+          final existing = chatMessages[i];
+          if (existing.id.startsWith('temp_') &&
+              existing.content == message.content &&
+              existing.type == message.type &&
+              existing.senderId == message.senderId &&
+              (existing.timestamp.difference(message.timestamp).inSeconds.abs() < 5)) {
+            optimisticIndex = i;
+            break;
+          }
+        }
+
+        if (optimisticIndex != null) {
+          // Replace optimistic message with real message from server
+          chatMessages[optimisticIndex] = message;
+        } else {
+          // New message from other user, add it
+          chatMessages.add(message);
+          chatMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+        }
+
+        currentMessages[message.chatId] = chatMessages;
+        state = state.copyWith(messages: currentMessages);
+      } catch (e) {
+        Logger.e('Error handling new message from socket', e);
+      }
+    });
+
     // Listen for message sent confirmation
     _socketDataSource.onMessageSent((data) {
       try {
@@ -66,13 +134,35 @@ class MessageController extends StateNotifier<MessageState> {
         final currentMessages = Map<String, List<MessageEntity>>.from(state.messages);
         final chatMessages = List<MessageEntity>.from(currentMessages[message.chatId] ?? []);
 
-        // Update or add message
-        final index = chatMessages.indexWhere((m) => m.id == message.id);
-        if (index != -1) {
-          chatMessages[index] = message;
+        // Try to find optimistic message by matching content and timestamp (within 5 seconds)
+        // This handles the case where optimistic message has temp ID but real message has backend ID
+        int? optimisticIndex;
+        for (int i = 0; i < chatMessages.length; i++) {
+          final existing = chatMessages[i];
+          if (existing.id.startsWith('temp_') &&
+              existing.content == message.content &&
+              existing.type == message.type &&
+              existing.senderId == message.senderId &&
+              (existing.timestamp.difference(message.timestamp).inSeconds.abs() < 5)) {
+            optimisticIndex = i;
+            break;
+          }
+        }
+
+        if (optimisticIndex != null) {
+          // Replace optimistic message with real message
+          chatMessages[optimisticIndex] = message;
         } else {
-          chatMessages.add(message);
-          chatMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+          // Check if message already exists by ID
+          final existingIndex = chatMessages.indexWhere((m) => m.id == message.id);
+          if (existingIndex != -1) {
+            // Update existing message
+            chatMessages[existingIndex] = message;
+          } else {
+            // Add new message (shouldn't happen for sent messages, but handle it)
+            chatMessages.add(message);
+            chatMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+          }
         }
 
         currentMessages[message.chatId] = chatMessages;
@@ -96,24 +186,84 @@ class MessageController extends StateNotifier<MessageState> {
 
     try {
       MessageEntity message;
+      String? optimisticId;
 
       if (useSocket) {
-        // Send via Socket.IO
+        // Get current user ID for optimistic message (async, but don't wait)
+        String? currentUserId;
+        final localStorage = InjectionContainer.resolve<LocalStorage>();
+        localStorage.read(StorageKeys.userProfile).then((userProfileJson) {
+          if (userProfileJson != null && userProfileJson.isNotEmpty) {
+            try {
+              final userProfile = jsonDecode(userProfileJson) as Map<String, dynamic>;
+              currentUserId = userProfile['id'] as String?;
+            } catch (e) {
+              Logger.w('Could not parse user profile: $e');
+            }
+          }
+        }).catchError((e) {
+          Logger.w('Could not get current user ID: $e');
+        });
+
+        // Create optimistic message IMMEDIATELY (synchronously) for instant UI feedback
+        optimisticId = 'temp_${DateTime.now().millisecondsSinceEpoch}_${content.hashCode}';
+        final now = DateTime.now();
+        message = MessageEntity(
+          id: optimisticId,
+          chatId: chatId,
+          senderId: '', // Will be updated when we get user ID
+          content: content,
+          type: type,
+          timestamp: now,
+          status: 'sending',
+        );
+
+        // Add optimistic message to state IMMEDIATELY
+        final currentMessages = Map<String, List<MessageEntity>>.from(state.messages);
+        final chatMessages = List<MessageEntity>.from(currentMessages[chatId] ?? []);
+        chatMessages.add(message);
+        chatMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+        currentMessages[chatId] = chatMessages;
+
+        state = state.copyWith(
+          messages: currentMessages,
+          sending: {...state.sending, chatId: false},
+        );
+
+        // Get user ID and update optimistic message
+        try {
+          final userProfileJson = await localStorage.read(StorageKeys.userProfile);
+          if (userProfileJson != null && userProfileJson.isNotEmpty) {
+            final userProfile = jsonDecode(userProfileJson) as Map<String, dynamic>;
+            currentUserId = userProfile['id'] as String?;
+            
+            // Update optimistic message with user ID
+            final updatedMessages = Map<String, List<MessageEntity>>.from(state.messages);
+            final updatedChatMessages = List<MessageEntity>.from(updatedMessages[chatId] ?? []);
+            final optimisticIndex = updatedChatMessages.indexWhere((m) => m.id == optimisticId);
+            if (optimisticIndex != -1 && currentUserId != null && currentUserId!.isNotEmpty) {
+              updatedChatMessages[optimisticIndex] = MessageEntity(
+                id: optimisticId!,
+                chatId: chatId,
+                senderId: currentUserId!,
+                content: content,
+                type: type,
+                timestamp: now,
+                status: 'sending',
+              );
+              updatedMessages[chatId] = updatedChatMessages;
+              state = state.copyWith(messages: updatedMessages);
+            }
+          }
+        } catch (e) {
+          Logger.w('Could not get current user ID for optimistic message: $e');
+        }
+
+        // Send via Socket.IO (non-blocking)
         _socketDataSource.sendMessage(
           chatId: chatId,
           type: type,
           content: content,
-        );
-
-        // Create optimistic message
-        message = MessageEntity(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          chatId: chatId,
-          senderId: '', // Will be set by backend
-          content: content,
-          type: type,
-          timestamp: DateTime.now(),
-          status: 'sending',
         );
       } else {
         // Send via REST API
@@ -122,22 +272,24 @@ class MessageController extends StateNotifier<MessageState> {
           type: type,
           content: content,
         );
+
+        // Add to local state
+        final currentMessages = Map<String, List<MessageEntity>>.from(state.messages);
+        final chatMessages = List<MessageEntity>.from(currentMessages[chatId] ?? []);
+        chatMessages.add(message);
+        chatMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+        currentMessages[chatId] = chatMessages;
+
+        state = state.copyWith(
+          messages: currentMessages,
+          sending: {...state.sending, chatId: false},
+        );
       }
 
-      // Add to local state
-      final currentMessages = Map<String, List<MessageEntity>>.from(state.messages);
-      final chatMessages = List<MessageEntity>.from(currentMessages[chatId] ?? []);
-      chatMessages.add(message);
-      chatMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-      currentMessages[chatId] = chatMessages;
-
-      state = state.copyWith(
-        messages: currentMessages,
-        sending: {...state.sending, chatId: false},
-      );
-
-      // Mark as delivered
-      await _repository.markAsDelivered(chatId);
+      // Mark as delivered (non-blocking for Socket.IO)
+      if (!useSocket) {
+        await _repository.markAsDelivered(chatId);
+      }
 
       return message;
     } catch (e) {
@@ -223,7 +375,34 @@ class MessageController extends StateNotifier<MessageState> {
 
       final currentMessages = Map<String, List<MessageEntity>>.from(state.messages);
       final chatMessages = List<MessageEntity>.from(currentMessages[chatId] ?? []);
-      chatMessages.removeWhere((m) => m.id == messageId);
+      
+      if (deleteForEveryone) {
+        // Remove message completely if deleted for everyone
+        chatMessages.removeWhere((m) => m.id == messageId);
+      } else {
+        // Mark as deleted for current user
+        final index = chatMessages.indexWhere((m) => m.id == messageId);
+        if (index != -1) {
+          final message = chatMessages[index];
+          chatMessages[index] = MessageEntity(
+            id: message.id,
+            chatId: message.chatId,
+            senderId: message.senderId,
+            senderName: message.senderName,
+            senderAvatar: message.senderAvatar,
+            content: message.content,
+            type: message.type,
+            timestamp: message.timestamp,
+            status: message.status,
+            editedAt: message.editedAt,
+            mediaUrl: message.mediaUrl,
+            mediaSize: message.mediaSize,
+            voiceDuration: message.voiceDuration,
+            isDeleted: true,
+          );
+        }
+      }
+      
       currentMessages[chatId] = chatMessages;
       state = state.copyWith(messages: currentMessages);
     } catch (e) {

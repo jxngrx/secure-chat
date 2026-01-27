@@ -26,6 +26,8 @@ class ChatRepositoryImpl implements ChatRepository {
               lastMessageId: model.lastMessageId,
               lastMessageTime: model.lastMessageTime,
               isGroup: model.isGroup,
+              lastMessage: model.lastMessage,
+              unreadCount: model.unreadCount,
             ))
         .toList();
   }
@@ -100,5 +102,10 @@ class ChatRepositoryImpl implements ChatRepository {
       mediaSize: model.mediaSize,
       voiceDuration: model.voiceDuration,
     );
+  }
+
+  @override
+  Future<void> deleteChat(String chatId) async {
+    await _remoteDataSource.deleteChat(chatId);
   }
 }

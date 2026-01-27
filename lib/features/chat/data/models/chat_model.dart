@@ -5,6 +5,8 @@ class ChatModel {
   final String? lastMessageId;
   final DateTime? lastMessageTime;
   final bool isGroup;
+  final Map<String, dynamic>? lastMessage; // Full last message object
+  final int? unreadCount; // Unread message count from backend
 
   ChatModel({
     required this.id,
@@ -13,6 +15,8 @@ class ChatModel {
     this.lastMessageId,
     this.lastMessageTime,
     this.isGroup = false,
+    this.lastMessage,
+    this.unreadCount,
   });
 
   Map<String, dynamic> toJson() {
@@ -48,20 +52,40 @@ class ChatModel {
       name = other['username'] as String? ?? other['name'] as String?;
     }
 
+    // Extract lastMessage object (can be a string ID or an object)
+    Map<String, dynamic>? lastMessageObj;
+    String? lastMessageIdFromField;
+    
+    if (json['lastMessage'] != null) {
+      if (json['lastMessage'] is String) {
+        // If lastMessage is a string, it's just the ID
+        lastMessageIdFromField = json['lastMessage'] as String;
+      } else if (json['lastMessage'] is Map<String, dynamic>) {
+        // If lastMessage is an object, extract it
+        lastMessageObj = json['lastMessage'] as Map<String, dynamic>;
+        lastMessageIdFromField = lastMessageObj['id'] as String?;
+      }
+    }
+
+    // Extract unreadCount if available
+    int? unreadCount;
+    if (json['unreadCount'] != null) {
+      unreadCount = json['unreadCount'] as int?;
+    }
+
     return ChatModel(
       id: chatId,
       name: name,
       participantIds: participantIds,
-      lastMessageId: json['lastMessageId'] as String? ??
-          (json['lastMessage'] != null
-              ? (json['lastMessage'] as Map<String, dynamic>)['id'] as String?
-              : null),
+      lastMessageId: json['lastMessageId'] as String? ?? lastMessageIdFromField,
       lastMessageTime: json['lastMessageAt'] != null
           ? DateTime.tryParse(json['lastMessageAt'] as String)
           : json['lastMessageTime'] != null
               ? DateTime.tryParse(json['lastMessageTime'] as String)
               : null,
       isGroup: json['isGroup'] as bool? ?? false,
+      lastMessage: lastMessageObj,
+      unreadCount: unreadCount,
     );
   }
 }

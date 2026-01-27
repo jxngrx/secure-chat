@@ -19,7 +19,9 @@ class UserRemoteDataSource {
       '/users/search',
       queryParameters: {'q': query},
     );
-    final users = response['data'] as List<dynamic>? ?? [];
+    // API returns { success: true, data: { users: [...] } }
+    final data = response['data'] as Map<String, dynamic>? ?? {};
+    final users = data['users'] as List<dynamic>? ?? [];
     return users.cast<Map<String, dynamic>>();
   }
 

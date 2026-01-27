@@ -1,6 +1,6 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -34,14 +34,16 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
   bool _isUsernameAvailable = false;
   bool _isCheckingUsername = false;
   bool _isLoading = false;
+  bool _isLoadingProfile = true;
+  String? _currentUsername;
 
   final ApiService _apiService = ApiService.instance;
+  final LocalStorage _localStorage = LocalStorage.instance;
 
   @override
   void initState() {
     super.initState();
-    _usernameController.text = UsernameGenerator.generate();
-    _checkUsernameAvailability();
+    _loadUserProfile();
     _usernameController.addListener(() {
       _onUsernameChanged();
       setState(() {}); // Update avatar when username changes
@@ -49,6 +51,61 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
     _bioController.addListener(() {
       setState(() {}); // Update character count
     });
+  }
+
+  Future<void> _loadUserProfile() async {
+    try {
+      // Try to load from local storage first
+      final cachedProfile = await _localStorage.read(StorageKeys.userProfile);
+      if (cachedProfile != null && cachedProfile.isNotEmpty) {
+        try {
+          final profileData = jsonDecode(cachedProfile) as Map<String, dynamic>;
+          final userModel = UserModel.fromJson(profileData);
+          if (mounted) {
+            setState(() {
+              _currentUsername = userModel.username;
+              if (userModel.username != null && userModel.username!.isNotEmpty) {
+                _usernameController.text = userModel.username!;
+                _checkUsernameAvailability();
+              } else {
+                _usernameController.text = UsernameGenerator.generate();
+                _checkUsernameAvailability();
+              }
+              _isLoadingProfile = false;
+            });
+          }
+        } catch (e) {
+          Logger.w('Error parsing cached profile: $e');
+        }
+      }
+
+      // Load fresh data from API
+      final profile = await _apiService.getProfile();
+      final userModel = UserModel.fromJson(profile);
+      
+      if (mounted) {
+        setState(() {
+          _currentUsername = userModel.username;
+          if (userModel.username != null && userModel.username!.isNotEmpty) {
+            _usernameController.text = userModel.username!;
+            _checkUsernameAvailability();
+          } else {
+            _usernameController.text = UsernameGenerator.generate();
+            _checkUsernameAvailability();
+          }
+          _isLoadingProfile = false;
+        });
+      }
+    } catch (e) {
+      Logger.e('Error loading user profile', e);
+      if (mounted) {
+        setState(() {
+          _usernameController.text = UsernameGenerator.generate();
+          _checkUsernameAvailability();
+          _isLoadingProfile = false;
+        });
+      }
+    }
   }
 
   @override
@@ -75,6 +132,15 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
     if (!Validators.isValidUsername(username)) {
       setState(() {
         _isUsernameAvailable = false;
+        _isCheckingUsername = false;
+      });
+      return;
+    }
+
+    // Don't check if username hasn't changed
+    if (username == _currentUsername) {
+      setState(() {
+        _isUsernameAvailable = true;
         _isCheckingUsername = false;
       });
       return;
@@ -207,7 +273,10 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
       return;
     }
 
-    if (!_isUsernameAvailable) {
+    // Check if username changed
+    final usernameChanged = username != _currentUsername;
+    
+    if (usernameChanged && !_isUsernameAvailable) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please choose an available username'),
@@ -222,33 +291,27 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
     });
 
     try {
-      // Call API to update username
-      final apiService = ApiService.instance;
-      final response = await apiService.updateUsername(username);
+      // Only update username if it changed
+      if (usernameChanged) {
+        // Call API to update username
+        final response = await _apiService.updateUsername(username);
 
-      // Update local storage with new user profile
-      final localStorage = InjectionContainer.resolve<LocalStorage>();
-      final userModel = UserModel.fromJson(response);
-      await localStorage.write(
-        StorageKeys.userProfile,
-        jsonEncode(userModel.toJson()),
-      );
+        // Update local storage with new user profile
+        final userModel = UserModel.fromJson(response);
+        await _localStorage.write(
+          StorageKeys.userProfile,
+          jsonEncode(userModel.toJson()),
+        );
 
-      Logger.d('Username updated successfully: $username');
+        Logger.d('Username updated successfully: $username');
+      } else {
+        Logger.d('Username unchanged, skipping update');
+      }
 
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
-
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Profile updated successfully'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
 
         // Navigate to contact sync screen
         Navigator.pushReplacementNamed(context, RouteNames.contactSync);
@@ -364,83 +427,25 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
     final backgroundColor = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
     return Column(
       children: [
-        GestureDetector(
-          onTap: _pickImage,
-          child: Stack(
-            children: [
-              Container(
-                width: 128,
-                height: 128,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isDark ? surfaceColor : Colors.white,
-                    width: 4,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 20,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: ClipOval(
-                  child: _selectedImage != null
-                      ? Image.file(
-                          _selectedImage!,
-                          fit: BoxFit.cover,
-                        )
-                      : _selectedImageBytes != null
-                          ? Image.memory(
-                              _selectedImageBytes!,
-                              fit: BoxFit.cover,
-                            )
-                          : _buildInitialsAvatar(_usernameController.text),
-                ),
-              ),
-              // Camera Badge
-              Positioned(
-                bottom: 4,
-                right: 4,
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
-                      width: 4,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.photo_camera,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
+        Container(
+          width: 128,
+          height: 128,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: isDark ? surfaceColor : Colors.white,
+              width: 4,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 20,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 16),
-        GestureDetector(
-          onTap: _pickImage,
-          child: Text(
-            'Add Photo',
-            style: TextStyle(
-              color: AppColors.primary,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
+          child: ClipOval(
+            child: _buildInitialsAvatar(_usernameController.text),
           ),
         ),
       ],

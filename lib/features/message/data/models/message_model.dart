@@ -65,7 +65,7 @@ class MessageModel {
     );
   }
 
-  MessageEntity toEntity() {
+  MessageEntity toEntity({bool isDeleted = false}) {
     return MessageEntity(
       id: id,
       chatId: chatId,
@@ -80,6 +80,7 @@ class MessageModel {
       mediaUrl: mediaUrl,
       mediaSize: mediaSize,
       voiceDuration: voiceDuration,
+      isDeleted: isDeleted,
     );
   }
 }

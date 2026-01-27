@@ -5,6 +5,8 @@ class ChatEntity {
   final String? lastMessageId;
   final DateTime? lastMessageTime;
   final bool isGroup;
+  final Map<String, dynamic>? lastMessage; // Full last message object
+  final int? unreadCount; // Unread message count
 
   ChatEntity({
     required this.id,
@@ -13,5 +15,7 @@ class ChatEntity {
     this.lastMessageId,
     this.lastMessageTime,
     this.isGroup = false,
+    this.lastMessage,
+    this.unreadCount,
   });
 }

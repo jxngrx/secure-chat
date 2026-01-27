@@ -95,11 +95,8 @@ class _HomeShellState extends State<HomeShell> {
     setState(() {
       _currentIndex = index;
     });
-    _pageController.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 280),
-      curve: Curves.easeOutCubic,
-    );
+    // Use jumpToPage for instant tab switching (no animation)
+    _pageController.jumpToPage(index);
   }
 
   @override

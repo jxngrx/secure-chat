@@ -234,15 +234,8 @@ class _OtpScreenState extends State<OtpScreen> {
           _isVerifying = false;
         });
 
-        // Check if user has username
-        final username = userData?['username'] as String?;
-        if (username == null || username.isEmpty) {
-          // Navigate to username setup
-          Navigator.pushReplacementNamed(context, RouteNames.usernameSetup);
-        } else {
-          // Navigate to contact sync or chat list
-          Navigator.pushReplacementNamed(context, RouteNames.contactSync);
-        }
+        // Always navigate to username setup first (for both new and existing users)
+        Navigator.pushReplacementNamed(context, RouteNames.usernameSetup);
       }
     } catch (e) {
       Logger.e('Error verifying OTP', e);
