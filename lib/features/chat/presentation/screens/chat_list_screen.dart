@@ -11,7 +11,14 @@ import '../../domain/entities/chat_entity.dart';
 import '../../../../di/providers.dart';
 
 class ChatListScreen extends ConsumerStatefulWidget {
-  const ChatListScreen({super.key});
+  const ChatListScreen({
+    super.key,
+    bool? showBottomNav,
+    this.onTabSelected,
+  }) : showBottomNav = showBottomNav ?? true;
+
+  final bool showBottomNav;
+  final ValueChanged<int>? onTabSelected;
 
   @override
   ConsumerState<ChatListScreen> createState() => _ChatListScreenState();
@@ -60,6 +67,11 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
   void _handleTabChange(int index) {
     if (index == _selectedTab) return; // Already on this tab
 
+    if (widget.onTabSelected != null) {
+      widget.onTabSelected!(index);
+      return;
+    }
+
     switch (index) {
       case 0: // Contacts
         Navigator.pushReplacementNamed(context, RouteNames.contacts);
@@ -87,6 +99,9 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     final hasChats = chats.isNotEmpty;
     final isLoading = chatState.isLoading;
 
+    final safeBottom = MediaQuery.of(context).padding.bottom;
+    final fabBottomPadding = widget.showBottomNav ? safeBottom + 80 : safeBottom + 16;
+
     return Scaffold(
       backgroundColor: backgroundColor,
       body: SafeArea(
@@ -108,7 +123,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
         ),
       ),
       floatingActionButton: Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 80),
+        padding: EdgeInsets.only(bottom: fabBottomPadding),
         child: FloatingActionButton(
           onPressed: _handleNewChat,
           backgroundColor: AppColors.primary,
@@ -116,7 +131,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      bottomNavigationBar: _buildBottomNavigation(isDark),
+      bottomNavigationBar: widget.showBottomNav ? _buildBottomNavigation(isDark) : null,
     );
   }
 

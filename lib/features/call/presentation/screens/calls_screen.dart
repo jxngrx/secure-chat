@@ -9,7 +9,14 @@ import '../notifiers/call_controller.dart';
 import '../../domain/entities/call_entity.dart';
 
 class CallsScreen extends ConsumerStatefulWidget {
-  const CallsScreen({super.key});
+  const CallsScreen({
+    super.key,
+    this.showBottomNav = true,
+    this.onTabSelected,
+  });
+
+  final bool showBottomNav;
+  final ValueChanged<int>? onTabSelected;
 
   @override
   ConsumerState<CallsScreen> createState() => _CallsScreenState();
@@ -38,6 +45,11 @@ class _CallsScreenState extends ConsumerState<CallsScreen> {
 
   void _handleTabChange(int index) {
     if (index == _selectedTab) return; // Already on this tab
+
+    if (widget.onTabSelected != null) {
+      widget.onTabSelected!(index);
+      return;
+    }
 
     switch (index) {
       case 0: // Contacts
@@ -96,7 +108,7 @@ class _CallsScreenState extends ConsumerState<CallsScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: _buildBottomNavigation(isDark),
+      bottomNavigationBar: widget.showBottomNav ? _buildBottomNavigation(isDark) : null,
     );
   }
 

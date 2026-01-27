@@ -22,7 +22,7 @@ class MediaRemoteDataSource {
       ),
     );
 
-    _dio.interceptors.add(
+    _dio!.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
           final token = await _secureStorage.read(StorageKeys.authToken);
@@ -34,7 +34,7 @@ class MediaRemoteDataSource {
       ),
     );
 
-    return _dio;
+    return _dio!;
   }
 
   /// Upload file (multipart/form-data, max 10MB)

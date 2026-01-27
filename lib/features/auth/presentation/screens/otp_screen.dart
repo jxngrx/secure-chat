@@ -2,7 +2,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/storage_keys.dart';
 import '../../../../core/routing/route_names.dart';
+import '../../../../core/services/api_service.dart';
+import '../../../../core/services/device_info_service.dart';
+import '../../../../core/services/device_registration_service.dart';
+import '../../../../core/services/location_service.dart';
+import '../../../../core/storage/secure_storage.dart';
+import '../../../../core/utils/logger.dart';
+import '../../../../di/injection_container.dart';
 
 class OtpScreen extends StatefulWidget {
   final String? phoneNumber; // Pass phone number from previous screen
@@ -27,13 +35,25 @@ class _OtpScreenState extends State<OtpScreen> {
   int _remainingSeconds = 59;
   bool _showResendButton = false;
   bool _showToast = false;
+  bool _isVerifying = false;
   String _maskedPhone = '+1 234 *** **89'; // Default masked phone
+  
+  // Services
+  final ApiService _apiService = ApiService.instance;
+  late final DeviceInfoService _deviceInfoService;
+  late final LocationService _locationService;
+  late final SecureStorage _secureStorage;
 
   @override
   void initState() {
     super.initState();
     _startTimer();
     _maskedPhone = _maskPhoneNumber(widget.phoneNumber ?? '+1234567890');
+    
+    // Initialize services
+    _deviceInfoService = InjectionContainer.resolve<DeviceInfoService>();
+    _locationService = InjectionContainer.resolve<LocationService>();
+    _secureStorage = SecureStorage.instance;
 
     // Auto-focus first field
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -139,19 +159,128 @@ class _OtpScreenState extends State<OtpScreen> {
     return _controllers.every((controller) => controller.text.isNotEmpty);
   }
 
-  void _verifyOtp() {
+  Future<void> _verifyOtp() async {
+    if (_isVerifying) return;
+    
     final otp = _controllers.map((c) => c.text).join();
+    final phoneNumber = widget.phoneNumber;
+
+    if (phoneNumber == null || phoneNumber.isEmpty) {
+      _showError('Phone number is missing');
+      return;
+    }
 
     // Dismiss keyboard
     FocusScope.of(context).unfocus();
 
-    // Simulate verification
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) {
-        // Navigate to next screen (username setup or chat list)
-        Navigator.pushReplacementNamed(context, RouteNames.usernameSetup);
-      }
+    setState(() {
+      _isVerifying = true;
     });
+
+    try {
+      // Get device info
+      final deviceDetails = await _deviceInfoService.getDeviceDetails();
+      
+      // Get location (optional, non-blocking)
+      Map<String, dynamic>? location;
+      try {
+        location = await _locationService.getCurrentLocation();
+      } catch (e) {
+        Logger.w('Could not get location for OTP verification: $e');
+        // Continue without location
+      }
+
+      // Verify OTP via API
+      final response = await _apiService.verifyOtp(
+        phoneNumber: phoneNumber,
+        otp: otp,
+        deviceId: deviceDetails.deviceId,
+        location: location,
+      );
+
+      // Store token and session
+      final token = response['token'] as String?;
+      final sessionData = response['session'] as Map<String, dynamic>?;
+      final userData = response['user'] as Map<String, dynamic>?;
+
+      if (token != null && token.isNotEmpty) {
+        await _secureStorage.write(StorageKeys.authToken, token);
+      }
+
+      if (sessionData != null) {
+        final sessionId = sessionData['sessionId'] as String?;
+        final deviceId = sessionData['deviceId'] as String?;
+        
+        if (sessionId != null) {
+          await _secureStorage.write(StorageKeys.sessionId, sessionId);
+        }
+        if (deviceId != null) {
+          await _secureStorage.write(StorageKeys.deviceId, deviceId);
+        }
+      }
+
+      // Register device if not already registered
+      try {
+        final deviceRegistrationService = InjectionContainer.resolve<DeviceRegistrationService>();
+        await deviceRegistrationService.registerDevice();
+        Logger.d('Device registered successfully after OTP verification');
+      } catch (e) {
+        Logger.w('Error registering device after OTP verification: $e');
+        // Continue even if device registration fails
+      }
+
+      if (mounted) {
+        setState(() {
+          _isVerifying = false;
+        });
+
+        // Check if user has username
+        final username = userData?['username'] as String?;
+        if (username == null || username.isEmpty) {
+          // Navigate to username setup
+          Navigator.pushReplacementNamed(context, RouteNames.usernameSetup);
+        } else {
+          // Navigate to contact sync or chat list
+          Navigator.pushReplacementNamed(context, RouteNames.contactSync);
+        }
+      }
+    } catch (e) {
+      Logger.e('Error verifying OTP', e);
+      
+      if (mounted) {
+        setState(() {
+          _isVerifying = false;
+        });
+
+        // Show error message
+        String errorMessage = 'Invalid OTP. Please try again.';
+        if (e.toString().contains('expired')) {
+          errorMessage = 'OTP has expired. Please request a new one.';
+        } else if (e.toString().contains('attempts')) {
+          errorMessage = 'Too many failed attempts. Please request a new OTP.';
+        } else if (e.toString().contains('network') || e.toString().contains('connection')) {
+          errorMessage = 'Network error. Please check your internet connection.';
+        }
+
+        _showError(errorMessage);
+        
+        // Clear OTP fields
+        for (var controller in _controllers) {
+          controller.clear();
+        }
+        _focusNodes[0].requestFocus();
+      }
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 4),
+      ),
+    );
   }
 
   void _handleBackspace(int index, String value) {
@@ -161,7 +290,13 @@ class _OtpScreenState extends State<OtpScreen> {
     }
   }
 
-  void _handleResend() {
+  Future<void> _handleResend() async {
+    final phoneNumber = widget.phoneNumber;
+    if (phoneNumber == null || phoneNumber.isEmpty) {
+      _showError('Phone number is missing');
+      return;
+    }
+
     setState(() {
       _remainingSeconds = 59;
       _showResendButton = false;
@@ -171,6 +306,29 @@ class _OtpScreenState extends State<OtpScreen> {
       _focusNodes[0].requestFocus();
     });
     _startTimer();
+
+    // Resend OTP
+    try {
+      await _apiService.requestOtp(phoneNumber);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('OTP sent successfully'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      Logger.e('Error resending OTP', e);
+      if (mounted) {
+        String errorMessage = 'Failed to resend OTP. Please try again.';
+        if (e.toString().contains('rate limit')) {
+          errorMessage = 'Too many requests. Please wait a minute.';
+        }
+        _showError(errorMessage);
+      }
+    }
   }
 
   void _handleEdit() {
@@ -215,8 +373,39 @@ class _OtpScreenState extends State<OtpScreen> {
                     _buildOtpInputs(isDark, surfaceColor),
                     const SizedBox(height: 40),
 
+                    // Loading indicator during verification
+                    if (_isVerifying)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  AppColors.primary,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Verifying...',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: isDark
+                                    ? const Color(0xFF94A3B8)
+                                    : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
                     // Timer / Resend
-                    _buildTimerAndResend(isDark),
+                    if (!_isVerifying) _buildTimerAndResend(isDark),
 
                     const SizedBox(height: 100),
 
@@ -329,26 +518,30 @@ class _OtpScreenState extends State<OtpScreen> {
   }
 
   Widget _buildOtpInputs(bool isDark, Color surfaceColor) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(6, (index) {
-        return Padding(
-          padding: EdgeInsets.only(
-            right: index < 5 ? 8 : 0,
-          ),
-          child: _OtpInputField(
-            controller: _controllers[index],
-            focusNode: _focusNodes[index],
-            isDark: isDark,
-            surfaceColor: surfaceColor,
-            onChanged: (value) {
-              if (value.isEmpty) {
-                _handleBackspace(index, value);
-              }
-            },
-          ),
-        );
-      }),
+    return Opacity(
+      opacity: _isVerifying ? 0.5 : 1.0,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(6, (index) {
+          return Padding(
+            padding: EdgeInsets.only(
+              right: index < 5 ? 8 : 0,
+            ),
+            child: _OtpInputField(
+              controller: _controllers[index],
+              focusNode: _focusNodes[index],
+              isDark: isDark,
+              surfaceColor: surfaceColor,
+              enabled: !_isVerifying,
+              onChanged: (value) {
+                if (value.isEmpty) {
+                  _handleBackspace(index, value);
+                }
+              },
+            ),
+          );
+        }),
+      ),
     );
   }
 
@@ -430,6 +623,7 @@ class _OtpInputField extends StatefulWidget {
   final FocusNode focusNode;
   final bool isDark;
   final Color surfaceColor;
+  final bool enabled;
   final ValueChanged<String> onChanged;
 
   const _OtpInputField({
@@ -437,6 +631,7 @@ class _OtpInputField extends StatefulWidget {
     required this.focusNode,
     required this.isDark,
     required this.surfaceColor,
+    this.enabled = true,
     required this.onChanged,
   });
 
@@ -500,6 +695,7 @@ class _OtpInputFieldState extends State<_OtpInputField> {
       child: TextField(
         controller: widget.controller,
         focusNode: widget.focusNode,
+        enabled: widget.enabled,
         textAlign: TextAlign.center,
         keyboardType: TextInputType.number,
         inputFormatters: [
@@ -517,6 +713,7 @@ class _OtpInputFieldState extends State<_OtpInputField> {
         ),
         onChanged: widget.onChanged,
         onTap: () {
+          if (!widget.enabled) return;
           // Select all text when tapped
           if (widget.controller.text.isNotEmpty) {
             widget.controller.selection = TextSelection(

@@ -14,6 +14,7 @@ import '../../features/chat/data/models/file_model.dart';
 import '../../features/call/presentation/screens/calls_screen.dart';
 import '../../features/contacts/presentation/screens/contacts_list_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
+import '../../features/settings/presentation/screens/edit_profile_screen.dart';
 import '../../features/user/presentation/screens/user_search_screen.dart';
 
 class AppRouter {
@@ -83,6 +84,10 @@ class AppRouter {
         return MaterialPageRoute(
           builder: (_) => const SettingsScreen(),
         );
+      case RouteNames.editProfile:
+        return MaterialPageRoute(
+          builder: (_) => const EditProfileScreen(),
+        );
       case RouteNames.calls:
         return MaterialPageRoute(
           builder: (_) => const CallsScreen(),
@@ -111,9 +116,43 @@ class AppRouter {
         );
       default:
         return MaterialPageRoute(
-          builder: (_) => Scaffold(
+          builder: (context) => Scaffold(
+            appBar: AppBar(
+              title: const Text('Page Not Found'),
+            ),
             body: Center(
-              child: Text('No route defined for ${settings.name}'),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: Colors.grey,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Route not found',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${settings.name}',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.grey,
+                        ),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).pushNamedAndRemoveUntil(
+                        RouteNames.splash,
+                        (route) => false,
+                      );
+                    },
+                    child: const Text('Go to Home'),
+                  ),
+                ],
+              ),
             ),
           ),
         );

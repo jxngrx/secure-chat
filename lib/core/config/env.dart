@@ -25,12 +25,12 @@ class Env {
 
   static final Map<Environment, EnvConfig> _envConfigs = {
     Environment.dev: const EnvConfig(
-      apiBaseUrl: 'http://localhost:3000',
-      socketUrl: 'http://localhost:3000',
+      apiBaseUrl: 'https://willard-ungrainable-subcortically.ngrok-free.dev',
+      socketUrl: 'https://willard-ungrainable-subcortically.ngrok-free.dev',
     ),
     Environment.prod: const EnvConfig(
-      apiBaseUrl: 'https://your-api-domain.com',
-      socketUrl: 'https://your-api-domain.com',
+      apiBaseUrl: 'https://willard-ungrainable-subcortically.ngrok-free.dev',
+      socketUrl: 'https://willard-ungrainable-subcortically.ngrok-free.dev',
     ),
   };
 

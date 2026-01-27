@@ -1,13 +1,21 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/storage_keys.dart';
 import '../../../../core/routing/route_names.dart';
+import '../../../../core/services/api_service.dart';
+import '../../../../core/storage/local_storage.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../core/utils/username_generator.dart';
+import '../../../../core/utils/logger.dart';
+import '../../../../core/utils/avatar_utils.dart';
+import '../../../../di/injection_container.dart';
+import '../../../user/data/models/user_model.dart';
 
 class UsernameSetupScreen extends StatefulWidget {
   const UsernameSetupScreen({super.key});
@@ -27,12 +35,17 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
   bool _isCheckingUsername = false;
   bool _isLoading = false;
 
+  final ApiService _apiService = ApiService.instance;
+
   @override
   void initState() {
     super.initState();
     _usernameController.text = UsernameGenerator.generate();
     _checkUsernameAvailability();
-    _usernameController.addListener(_onUsernameChanged);
+    _usernameController.addListener(() {
+      _onUsernameChanged();
+      setState(() {}); // Update avatar when username changes
+    });
     _bioController.addListener(() {
       setState(() {}); // Update character count
     });
@@ -71,15 +84,24 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
       _isCheckingUsername = true;
     });
 
-    // Simulate API call to check username availability
-    await Future.delayed(const Duration(milliseconds: 500));
+    try {
+      // Call API to check username availability
+      final isAvailable = await _apiService.checkUsernameAvailability(username);
 
-    if (mounted) {
-      setState(() {
-        _isCheckingUsername = false;
-        // For demo, consider username available if it's valid
-        _isUsernameAvailable = Validators.isValidUsername(username);
-      });
+      if (mounted) {
+        setState(() {
+          _isCheckingUsername = false;
+          _isUsernameAvailable = isAvailable;
+        });
+      }
+    } catch (e) {
+      Logger.e('Error checking username availability', e);
+      if (mounted) {
+        setState(() {
+          _isCheckingUsername = false;
+          _isUsernameAvailable = false;
+        });
+      }
     }
   }
 
@@ -143,7 +165,36 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
     _checkUsernameAvailability();
   }
 
-  void _handleStartMessaging() {
+  Widget _buildInitialsAvatar(String name) {
+    final initials = AvatarUtils.getInitials(name);
+    final colorValue = AvatarUtils.getColorForName(name);
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: Color(colorValue),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(colorValue),
+            Color(colorValue).withOpacity(0.7),
+          ],
+        ),
+      ),
+      child: Center(
+        child: Text(
+          initials,
+          style: const TextStyle(
+            fontSize: 48,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleStartMessaging() async {
     final username = _usernameController.text.trim();
 
     if (!Validators.isValidUsername(username)) {
@@ -170,16 +221,65 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
       _isLoading = true;
     });
 
-    // Simulate API call
-    Future.delayed(const Duration(seconds: 1), () {
+    try {
+      // Call API to update username
+      final apiService = ApiService.instance;
+      final response = await apiService.updateUsername(username);
+
+      // Update local storage with new user profile
+      final localStorage = InjectionContainer.resolve<LocalStorage>();
+      final userModel = UserModel.fromJson(response);
+      await localStorage.write(
+        StorageKeys.userProfile,
+        jsonEncode(userModel.toJson()),
+      );
+
+      Logger.d('Username updated successfully: $username');
+
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
-        // Navigate to contact sync screen instead of chat list
+
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile updated successfully'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+
+        // Navigate to contact sync screen
         Navigator.pushReplacementNamed(context, RouteNames.contactSync);
       }
-    });
+    } catch (e) {
+      Logger.e('Error updating username', e);
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        // Show error message
+        String errorMessage = 'Failed to update username. Please try again.';
+        if (e.toString().contains('taken') || e.toString().contains('exists')) {
+          errorMessage = 'This username is already taken. Please choose another.';
+        } else if (e.toString().contains('network') || e.toString().contains('connection')) {
+          errorMessage = 'Network error. Please check your internet connection.';
+        } else if (e.toString().contains('invalid') || e.toString().contains('validation')) {
+          errorMessage = 'Invalid username format. Please use 3-30 alphanumeric characters and underscores.';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -296,24 +396,7 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
                               _selectedImageBytes!,
                               fit: BoxFit.cover,
                             )
-                          : Container(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    AppColors.primary.withOpacity(0.6),
-                                    AppColors.primary.withOpacity(0.3),
-                                    const Color(0xFF6B46C1).withOpacity(0.4),
-                                  ],
-                                ),
-                              ),
-                              child: Icon(
-                                Icons.person,
-                                size: 64,
-                                color: Colors.white.withOpacity(0.8),
-                              ),
-                            ),
+                          : _buildInitialsAvatar(_usernameController.text),
                 ),
               ),
               // Camera Badge

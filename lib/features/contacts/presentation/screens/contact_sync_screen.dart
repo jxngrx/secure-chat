@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:permission_handler/permission_handler.dart' as ph;
+import 'package:flutter_contacts/flutter_contacts.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/routing/route_names.dart';
 import '../../../../core/permissions/permission_handler.dart' as AppPermissionHandler;
+import '../../../../core/services/api_service.dart';
+import '../../../../core/services/contact_service.dart';
+import '../../../../core/utils/logger.dart';
 
 class ContactSyncScreen extends StatefulWidget {
   const ContactSyncScreen({super.key});
@@ -13,61 +17,185 @@ class ContactSyncScreen extends StatefulWidget {
 
 class _ContactSyncScreenState extends State<ContactSyncScreen> {
   bool _isLoading = false;
+  String? _errorMessage;
   final AppPermissionHandler.PermissionHandler _permissionHandler =
       AppPermissionHandler.PermissionHandler.instance;
+  final ContactService _contactService = ContactService.instance;
+  final ApiService _apiService = ApiService.instance;
 
   Future<void> _handleAllowAccess() async {
     setState(() {
       _isLoading = true;
+      _errorMessage = null;
     });
 
     try {
-      // Check if permission is already granted
-      final isGranted = await _permissionHandler.isContactsPermissionGranted();
+      // Check current permission status using permission_handler
+      final status = await ph.Permission.contacts.status;
+      Logger.d('Current contacts permission status: $status');
 
-      if (isGranted) {
-        _navigateToChatList();
+      // If already granted, sync contacts
+      if (status.isGranted) {
+        Logger.d('Permission already granted, syncing contacts');
+        await _syncContacts();
         return;
       }
 
-      // Check if permission is permanently denied
-      final isPermanentlyDenied =
-          await _permissionHandler.isContactsPermissionPermanentlyDenied();
-
-      if (isPermanentlyDenied) {
-        // Show dialog to open settings
+      // If permanently denied, show settings dialog
+      if (status.isPermanentlyDenied) {
+        Logger.d('Permission permanently denied, showing settings dialog');
         if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
           _showSettingsDialog();
         }
         return;
       }
 
-      // Request permission
-      final granted = await _permissionHandler.requestContactsPermission();
+      // Request permission - try FlutterContacts first (most reliable)
+      bool granted = false;
+      
+      Logger.d('Requesting contacts permission...');
+      
+      // Method 1: Try FlutterContacts (recommended for contacts)
+      try {
+        granted = await FlutterContacts.requestPermission(readonly: true);
+        Logger.d('FlutterContacts.requestPermission result: $granted');
+      } catch (e) {
+        Logger.w('FlutterContacts.requestPermission error: $e');
+      }
+      
+      // Method 2: If not granted, try permission_handler
+      if (!granted) {
+        try {
+          final newStatus = await ph.Permission.contacts.request();
+          Logger.d('Permission_handler.request result: $newStatus');
+          granted = newStatus.isGranted;
+        } catch (e) {
+          Logger.w('Permission_handler.request error: $e');
+        }
+      }
+
+      // Verify final status
+      if (granted) {
+        final finalStatus = await ph.Permission.contacts.status;
+        granted = finalStatus.isGranted;
+        Logger.d('Final permission status after request: $finalStatus');
+      }
 
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-
         if (granted) {
-          _navigateToChatList();
+          // Permission granted, sync contacts
+          Logger.d('Permission granted, syncing contacts');
+          await _syncContacts();
         } else {
-          // Permission denied, show message
-          _showPermissionDeniedMessage();
+          // Permission denied
+          Logger.w('Permission denied by user');
+          setState(() {
+            _isLoading = false;
+          });
+          
+          // Check if it's now permanently denied
+          final finalStatus = await ph.Permission.contacts.status;
+          if (finalStatus.isPermanentlyDenied) {
+            _showSettingsDialog();
+          } else {
+            _showPermissionDeniedMessage();
+          }
         }
       }
     } catch (e) {
+      Logger.e('Error in _handleAllowAccess', e);
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _errorMessage = 'Error requesting permission: $e';
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error requesting permission: $e'),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
           ),
         );
+      }
+    }
+  }
+
+  /// Sync contacts with backend
+  Future<void> _syncContacts() async {
+    try {
+      // Get phone numbers from device contacts
+      final phoneNumbers = await _contactService.getPhoneNumbers();
+
+      if (phoneNumbers.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No contacts found with phone numbers'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 3),
+            ),
+          );
+          // Navigate anyway (user can sync later)
+          _navigateToChatList();
+        }
+        return;
+      }
+
+      // Sync contacts with backend via API
+      // ApiService automatically hashes phone numbers
+      final syncedContacts = await _apiService.syncContacts(phoneNumbers);
+
+      Logger.d('Synced ${syncedContacts.length} contacts with backend');
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              syncedContacts.isEmpty
+                  ? 'No contacts found using this app'
+                  : 'Found ${syncedContacts.length} contact${syncedContacts.length == 1 ? '' : 's'} using this app',
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+
+        // Navigate to chat list
+        _navigateToChatList();
+      }
+    } catch (e) {
+      Logger.e('Error syncing contacts', e);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        String errorMessage = 'Failed to sync contacts. Please try again.';
+        if (e.toString().contains('network') || e.toString().contains('connection')) {
+          errorMessage = 'Network error. Please check your internet connection.';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+
+        // Navigate anyway (user can sync later from settings)
+        _navigateToChatList();
       }
     }
   }
@@ -97,7 +225,7 @@ class _ContactSyncScreenState extends State<ContactSyncScreen> {
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              await openAppSettings();
+              await ph.openAppSettings();
             },
             child: const Text('Open Settings'),
           ),
@@ -368,19 +496,39 @@ class _ContactSyncScreenState extends State<ContactSyncScreen> {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    Text(
-                      'Allow Access',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        letterSpacing: 0.5,
+                    if (!_isLoading)
+                      Text(
+                        'Allow Access',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
+                        ),
                       ),
-                    ),
                     if (_isLoading)
-                      CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Syncing contacts...',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
                       ),
                   ],
                 ),

@@ -1,7 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/constants/storage_keys.dart';
 import '../../../../core/routing/route_names.dart';
+import '../../../../core/storage/secure_storage.dart';
+import '../../../../core/storage/local_storage.dart';
+import '../../../../di/injection_container.dart';
+import '../../../../core/utils/logger.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -27,12 +33,71 @@ class _SplashScreenState extends State<SplashScreen>
     );
     _controller.forward();
 
-    // Navigate to welcome screen after 3 seconds
-    Timer(const Duration(seconds: 3), () {
+    // Check authentication state and navigate accordingly
+    _checkAuthAndNavigate();
+  }
+
+  Future<void> _checkAuthAndNavigate() async {
+    try {
+      // Wait for minimum splash duration (2 seconds) for better UX
+      await Future.delayed(const Duration(seconds: 2));
+
+      if (!mounted) return;
+
+      // Check if user is authenticated
+      final secureStorage = InjectionContainer.resolve<SecureStorage>();
+      final localStorage = InjectionContainer.resolve<LocalStorage>();
+      
+      final authToken = await secureStorage.read(StorageKeys.authToken);
+      final sessionId = await secureStorage.read(StorageKeys.sessionId);
+
+      if (authToken != null && authToken.isNotEmpty && sessionId != null && sessionId.isNotEmpty) {
+        // User is authenticated, check if they have username
+        try {
+          final userProfileJson = await localStorage.read(StorageKeys.userProfile);
+          if (userProfileJson != null && userProfileJson.isNotEmpty) {
+            final userProfile = jsonDecode(userProfileJson) as Map<String, dynamic>;
+            final username = userProfile['username'] as String?;
+            
+            if (mounted) {
+              if (username == null || username.isEmpty || username.startsWith('user_')) {
+                // User doesn't have a proper username, navigate to username setup
+                Logger.d('User is authenticated but has no username, navigating to username setup');
+                Navigator.pushReplacementNamed(context, RouteNames.usernameSetup);
+              } else {
+                // User is fully authenticated with username, navigate to chat list
+                Logger.d('User is fully authenticated, navigating to chat list');
+                Navigator.pushReplacementNamed(context, RouteNames.chatList);
+              }
+            }
+          } else {
+            // No user profile stored, navigate to username setup to be safe
+            if (mounted) {
+              Logger.d('User is authenticated but no profile found, navigating to username setup');
+              Navigator.pushReplacementNamed(context, RouteNames.usernameSetup);
+            }
+          }
+        } catch (e) {
+          Logger.e('Error reading user profile in splash screen', e);
+          // On error reading profile, navigate to username setup
+          if (mounted) {
+            Navigator.pushReplacementNamed(context, RouteNames.usernameSetup);
+          }
+        }
+      } else {
+        // User is not authenticated, navigate to welcome screen
+        if (mounted) {
+          Logger.d('User is not authenticated, navigating to welcome screen');
+          Navigator.pushReplacementNamed(context, RouteNames.welcome);
+        }
+      }
+    } catch (e) {
+      Logger.e('Error checking auth state in splash screen', e);
+      // On error, navigate to welcome screen (safe default)
       if (mounted) {
         Navigator.pushReplacementNamed(context, RouteNames.welcome);
       }
-    });
+    }
   }
 
   @override

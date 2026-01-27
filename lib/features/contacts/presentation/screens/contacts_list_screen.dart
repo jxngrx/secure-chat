@@ -7,7 +7,14 @@ import '../notifiers/contact_controller.dart';
 import '../../domain/entities/contact_entity.dart';
 
 class ContactsListScreen extends ConsumerStatefulWidget {
-  const ContactsListScreen({super.key});
+  const ContactsListScreen({
+    super.key,
+    this.showBottomNav = true,
+    this.onTabSelected,
+  });
+
+  final bool showBottomNav;
+  final ValueChanged<int>? onTabSelected;
 
   @override
   ConsumerState<ContactsListScreen> createState() => _ContactsListScreenState();
@@ -34,6 +41,11 @@ class _ContactsListScreenState extends ConsumerState<ContactsListScreen> {
 
   void _handleTabChange(int index) {
     if (index == _selectedTab) return; // Already on this tab
+
+    if (widget.onTabSelected != null) {
+      widget.onTabSelected!(index);
+      return;
+    }
 
     switch (index) {
       case 0: // Contacts
@@ -78,7 +90,7 @@ class _ContactsListScreenState extends ConsumerState<ContactsListScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: _buildBottomNavigation(isDark),
+      bottomNavigationBar: widget.showBottomNav ? _buildBottomNavigation(isDark) : null,
     );
   }
 

@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/routing/route_names.dart';
 import '../../../../core/utils/phone_formatter.dart';
+import '../../../../core/services/api_service.dart';
+import '../../../../core/utils/logger.dart';
 import '../../data/models/country_model.dart';
 
 class PhoneInputScreen extends StatefulWidget {
@@ -46,10 +48,8 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
 
   // Country selection removed - India only
 
-  void _handleContinue() {
+  Future<void> _handleContinue() async {
     final phoneNumber = _phoneController.text;
-    // TODO: Use fullPhoneNumber when sending to API
-    // final fullPhoneNumber = '${_selectedCountry.dialCode}${PhoneFormatter.getUnformattedPhone(phoneNumber)}';
 
     if (!PhoneFormatter.isValidPhoneNumber(phoneNumber, _selectedCountry.dialCode)) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -65,21 +65,49 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
       _isLoading = true;
     });
 
-    // Simulate API call
-    Future.delayed(const Duration(seconds: 1), () {
+    try {
+      // Construct full phone number with country code
+      final fullPhoneNumber = '${_selectedCountry.dialCode}$phoneNumber';
+      
+      // Request OTP via API
+      await ApiService.instance.requestOtp(fullPhoneNumber);
+      
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
-        // No gaps in phone number - use as is
-        final fullPhoneNumber = '${_selectedCountry.dialCode}$phoneNumber';
+        
+        // Navigate to OTP screen
         Navigator.pushNamed(
           context,
           RouteNames.otp,
           arguments: fullPhoneNumber,
         );
       }
-    });
+    } catch (e) {
+      Logger.e('Error requesting OTP', e);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        
+        // Show error message
+        String errorMessage = 'Failed to send OTP. Please try again.';
+        if (e.toString().contains('rate limit')) {
+          errorMessage = 'Too many requests. Please wait a minute before trying again.';
+        } else if (e.toString().contains('network') || e.toString().contains('connection')) {
+          errorMessage = 'Network error. Please check your internet connection.';
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -237,10 +265,12 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                   controller: _phoneController,
                   autofocus: true,
                   keyboardType: TextInputType.phone,
+                  maxLength: 10,
+                  minLines: 1,
+                  maxLines: 1,
                   inputFormatters: [
                     FilteringTextInputFormatter.digitsOnly,
                     LengthLimitingTextInputFormatter(10),
-                    // No formatter - display without gaps
                   ],
                   style: TextStyle(
                     fontSize: 18,
@@ -254,6 +284,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                       color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
                     ),
                     border: InputBorder.none,
+                    counterText: '', // Hide character counter
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 12,
@@ -295,8 +326,8 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
   }
 
   Widget _buildContinueButton(bool isDark) {
-    final phoneDigits = PhoneFormatter.getUnformattedPhone(_phoneController.text);
-    final isValid = phoneDigits.length >= 7;
+    final phoneDigits = _phoneController.text.trim();
+    final isValid = phoneDigits.length == 10; // Exactly 10 digits
 
     return Container(
       width: double.infinity,
@@ -317,7 +348,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: isValid && !_isLoading ? _handleContinue : () {},
+          onTap: isValid && !_isLoading ? _handleContinue : null,
           borderRadius: BorderRadius.circular(12),
           child: Stack(
             alignment: Alignment.center,

@@ -2,9 +2,11 @@ import 'package:get_it/get_it.dart';
 
 import '../core/network/api_client.dart';
 import '../core/network/socket_client.dart';
+import '../core/services/api_service.dart';
 import '../core/services/device_info_service.dart';
 import '../core/services/device_registration_service.dart';
 import '../core/services/location_service.dart';
+import '../core/services/contact_service.dart';
 import '../core/services/background_service_manager.dart';
 import '../core/storage/local_storage.dart';
 import '../core/storage/secure_storage.dart';
@@ -40,6 +42,10 @@ class InjectionContainer {
       _getIt.registerLazySingleton<ApiClient>(() => ApiClient.instance);
     }
 
+    if (!_getIt.isRegistered<ApiService>()) {
+      _getIt.registerLazySingleton<ApiService>(() => ApiService.instance);
+    }
+
     if (!_getIt.isRegistered<SecureStorage>()) {
       _getIt.registerLazySingleton<SecureStorage>(() => SecureStorage.instance);
     }
@@ -70,6 +76,10 @@ class InjectionContainer {
           _getIt<SecureStorage>(),
         ),
       );
+    }
+
+    if (!_getIt.isRegistered<ContactService>()) {
+      _getIt.registerLazySingleton<ContactService>(() => ContactService.instance);
     }
 
     if (!_getIt.isRegistered<SocketClient>()) {

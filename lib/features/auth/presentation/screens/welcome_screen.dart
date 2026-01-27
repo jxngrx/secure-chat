@@ -38,9 +38,11 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final backgroundColor = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
 
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      body: SafeArea(
+    return PopScope(
+      canPop: false, // Prevent back navigation to splash
+      child: Scaffold(
+        backgroundColor: backgroundColor,
+        body: SafeArea(
         child: Stack(
           children: [
             // Background Ambient Glow
@@ -385,6 +387,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
             ),
           ],
         ),
+      ),
       ),
     );
   }

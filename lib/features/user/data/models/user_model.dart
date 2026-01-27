@@ -43,6 +43,20 @@ class UserModel {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'phone': phone,
+      'username': username,
+      'email': email,
+      'authMethod': authMethod,
+      'isOnline': isOnline,
+      'lastSeen': lastSeen?.toIso8601String(),
+      'createdAt': createdAt?.toIso8601String(),
+      'updatedAt': updatedAt?.toIso8601String(),
+    };
+  }
+
   UserEntity toEntity() {
     return UserEntity(
       id: id,

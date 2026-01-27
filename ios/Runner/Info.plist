@@ -51,5 +51,7 @@
 	<string>We need your location to provide better services and track your device location even when the app is in the background.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>We need your location to provide better services and track your device location even when the app is in the background.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>We need access to your contacts to find friends who are using this app.</string>
 </dict>
 </plist>
