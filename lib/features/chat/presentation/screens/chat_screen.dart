@@ -85,11 +85,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   void _onScroll() {
     if (!_scrollController.hasClients) return;
-    
+
     final maxScroll = _scrollController.position.maxScrollExtent;
     final currentScroll = _scrollController.position.pixels;
     final isAtBottom = (maxScroll - currentScroll) < 100; // 100px threshold
-    
+
     if (_showScrollToBottomButton != !isAtBottom) {
       setState(() {
         _showScrollToBottomButton = !isAtBottom;
@@ -98,7 +98,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     // Mark messages as read when user scrolls and views them
     final now = DateTime.now();
-    if (_lastMarkAsReadTime == null || 
+    if (_lastMarkAsReadTime == null ||
         now.difference(_lastMarkAsReadTime!).inMilliseconds > _markAsReadDebounceMs) {
       _lastMarkAsReadTime = now;
       _markVisibleMessagesAsRead();
@@ -107,16 +107,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Future<void> _markVisibleMessagesAsRead() async {
     if (_currentUserId == null) return;
-    
+
     try {
       final messageState = ref.read(messageControllerProvider);
       final messages = messageState.messages[widget.chatId] ?? [];
-      
+
       // Check if there are any unread messages from other users
-      final hasUnreadMessages = messages.any((msg) => 
+      final hasUnreadMessages = messages.any((msg) =>
         msg.senderId != _currentUserId && msg.status != 'read'
       );
-      
+
       if (hasUnreadMessages) {
         // Mark all unread messages in this chat as read
         await ref.read(messageControllerProvider.notifier).markAsRead(widget.chatId);
@@ -218,7 +218,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         final maxScroll = _scrollController.position.maxScrollExtent;
         final currentScroll = _scrollController.position.pixels;
         final isAtBottom = (maxScroll - currentScroll) < 100;
-        
+
         // Only scroll if at bottom or forced (for current user messages)
         if (force || isAtBottom) {
           _scrollController.animateTo(
@@ -289,7 +289,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
             // Input Area
             if (_selectedMessages.isEmpty) _buildInputArea(isDark),
-            
+
             // Selection mode bottom bar
             if (_selectedMessages.isNotEmpty)
               _buildSelectionBottomBar(isDark),
@@ -422,25 +422,39 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
-  Widget _buildDeletedMessage(bool isDark, bool isCurrentUser) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          Icons.delete_outline,
-          size: 16,
-          color: isDark ? Colors.grey[400] : Colors.grey[600],
+  Widget _buildDeletedMessage(bool isDark, String text, {bool isSender = false}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFE0E0E0),
+        borderRadius: BorderRadius.only(
+          topLeft: const Radius.circular(12),
+          topRight: const Radius.circular(12),
+          bottomLeft: isSender ? const Radius.circular(12) : const Radius.circular(0),
+          bottomRight: isSender ? const Radius.circular(0) : const Radius.circular(12),
         ),
-        const SizedBox(width: 4),
-        Text(
-          'This message was deleted',
-          style: TextStyle(
-            fontSize: 14,
-            fontStyle: FontStyle.italic,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.block,
+            size: 16,
             color: isDark ? Colors.grey[400] : Colors.grey[600],
           ),
-        ),
-      ],
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 14,
+                fontStyle: FontStyle.italic,
+                color: isDark ? Colors.grey[400] : Colors.grey[600],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -609,17 +623,29 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Widget _buildMessagesList(bool isDark) {
     final messageState = ref.watch(messageControllerProvider);
-    final messages = messageState.messages[widget.chatId] ?? [];
-    final currentMessageCount = messages.length;
+    var messages = messageState.messages[widget.chatId] ?? [];
 
     // Get current user ID from local storage or auth state
     final currentUserId = _currentUserId ?? '';
+
+    // Filter out messages that are "Deleted for Me"
+    messages = messages.where((m) {
+      if (m.deleteForEveryone) return true; // Show "This message was deleted"
+
+      final isSender = m.senderId == currentUserId;
+      if (isSender && m.sentUserMessageIsDeleted) return false;
+      if (!isSender && m.receiveUserMessageIsDeleted) return false;
+
+      return true;
+    }).toList();
+
+    final currentMessageCount = messages.length;
 
     // Check if new message was added (from other user)
     if (currentMessageCount > _previousMessageCount && messages.isNotEmpty) {
       final lastMessage = messages.last;
       final isFromCurrentUser = lastMessage.senderId == currentUserId;
-      
+
       // Only auto-scroll if message is from other user and user is at bottom
       // (Current user messages already scroll in _handleSendMessage)
       if (!isFromCurrentUser) {
@@ -627,7 +653,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           _scrollToBottom(force: false);
         });
       }
-      
+
       _previousMessageCount = currentMessageCount;
     } else if (currentMessageCount != _previousMessageCount) {
       // Message count changed (could be deletion or initial load)
@@ -701,7 +727,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       mediaUrl: message.mediaUrl,
       mediaSize: message.mediaSize,
       voiceDuration: message.voiceDuration,
-      isDeleted: message.isDeleted,
+      deleteForEveryone: message.deleteForEveryone,
+      sentUserMessageIsDeleted: message.sentUserMessageIsDeleted,
+      receiveUserMessageIsDeleted: message.receiveUserMessageIsDeleted,
     );
     return _buildMessageBubble(messageModel, isDark, isCurrentUser, showAvatar);
   }
@@ -727,6 +755,54 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Widget _buildMessageBubble(MessageModel message, bool isDark, bool isCurrentUser, bool showAvatar) {
+    // Check deletion status
+    if (message.deleteForEveryone) {
+      if (isCurrentUser && message.sentUserMessageIsDeleted) {
+         // Sender sees "You deleted this message" if they deleted for everyone
+         return Padding(
+           padding: const EdgeInsets.only(bottom: 4, right: 16, left: 16),
+           child: Row(
+             mainAxisAlignment: isCurrentUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+             children: [
+               _buildDeletedMessage(isDark, "You deleted this message", isSender: isCurrentUser),
+             ],
+           ),
+         );
+      }
+      // Everyone else sees "This message was deleted"
+      return Padding(
+           padding: const EdgeInsets.only(bottom: 4, right: 16, left: 16),
+           child: Row(
+             mainAxisAlignment: isCurrentUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+             children: [
+               if (!isCurrentUser && showAvatar) ...[
+                 Container(
+                  width: 32,
+                  height: 32,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _getAvatarColor(message.senderName ?? 'User'),
+                  ),
+                  child: Center(
+                    child: Text(
+                      _getInitials(message.senderName ?? 'U'),
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                  ),
+                ),
+               ] else if (!isCurrentUser)
+                 const SizedBox(width: 40),
+
+               _buildDeletedMessage(isDark, "This message was deleted", isSender: isCurrentUser),
+             ],
+           ),
+         );
+    }
+
+    // "Delete for me" is handled by filtering out the message in _buildMessagesList
+    // So if we are here, it's a normal message
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
@@ -812,9 +888,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (message.isDeleted ?? false)
-                          _buildDeletedMessage(isDark, isCurrentUser)
-                        else if (message.type == MessageType.missedCall)
+                        if (message.type == MessageType.missedCall)
                           _buildMissedCallMessage(message, isCurrentUser)
                         else if (message.type == MessageType.image && message.mediaUrl != null)
                           _buildImageMessage(message, isCurrentUser)
@@ -972,7 +1046,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       color: index == 8
                           ? AppColors.primary
                           : (isCurrentUser
-                              ? Colors.white.withOpacity(0.5)
+                              ? Colors.white.withValues(alpha: 0.5)
                               : Colors.grey[400]),
                       borderRadius: BorderRadius.circular(1),
                     ),
@@ -990,7 +1064,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     style: TextStyle(
                       fontSize: 12,
                       color: isCurrentUser
-                          ? Colors.white.withOpacity(0.7)
+                          ? Colors.white.withValues(alpha: 0.7)
                           : Colors.grey[600],
                       fontWeight: FontWeight.w500,
                     ),
@@ -1000,7 +1074,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     style: TextStyle(
                       fontSize: 12,
                       color: isCurrentUser
-                          ? Colors.white.withOpacity(0.7)
+                          ? Colors.white.withValues(alpha: 0.7)
                           : Colors.grey[600],
                     ),
                   ),
@@ -1082,7 +1156,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 20,
                         spreadRadius: 2,
                       ),
@@ -1171,8 +1245,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: isDark
-                      ? AppColors.dividerDark.withOpacity(0.3)
-                      : AppColors.dividerLight.withOpacity(0.6),
+                      ? AppColors.dividerDark.withValues(alpha: 0.3)
+                      : AppColors.dividerLight.withValues(alpha: 0.6),
                 ),
               ),
               child: Column(
@@ -1192,8 +1266,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     style: TextStyle(
                       fontSize: 14,
                       color: isDark
-                          ? AppColors.textSecondaryDark.withOpacity(0.8)
-                          : AppColors.textSecondaryLight.withOpacity(0.8),
+                          ? AppColors.textSecondaryDark.withValues(alpha: 0.8)
+                          : AppColors.textSecondaryLight.withValues(alpha: 0.8),
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -1231,7 +1305,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Widget _buildInputArea(bool isDark) {
-    final backgroundColor = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
     final surfaceColor = isDark ? AppColors.surfaceDark : AppColors.backgroundDark;
     final hasText = _messageController.text.trim().isNotEmpty;
 
@@ -1240,7 +1313,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         bottom: MediaQuery.of(context).padding.bottom,
       ),
       decoration: BoxDecoration(
-        color: surfaceColor.withOpacity(0.85),
+        color: surfaceColor.withValues(alpha: 0.85),
         border: Border(
           top: BorderSide(
             color: isDark ? AppColors.dividerDark : AppColors.dividerLight,

@@ -14,7 +14,9 @@ class MessageModel {
   final String? mediaUrl;
   final String? mediaSize; // For images/files
   final int? voiceDuration; // For voice messages in seconds
-  final bool? isDeleted; // Whether message is deleted for current user
+  final bool deleteForEveryone;
+  final bool sentUserMessageIsDeleted;
+  final bool receiveUserMessageIsDeleted;
 
   MessageModel({
     required this.id,
@@ -30,7 +32,9 @@ class MessageModel {
     this.mediaUrl,
     this.mediaSize,
     this.voiceDuration,
-    this.isDeleted,
+    this.deleteForEveryone = false,
+    this.sentUserMessageIsDeleted = false,
+    this.receiveUserMessageIsDeleted = false,
   });
 
   Map<String, dynamic> toJson() {
@@ -48,6 +52,9 @@ class MessageModel {
       'mediaUrl': mediaUrl,
       'mediaSize': mediaSize,
       'voiceDuration': voiceDuration,
+      'deleteForEveryone': deleteForEveryone,
+      'sentUserMessageIsDeleted': sentUserMessageIsDeleted,
+      'receiveUserMessageIsDeleted': receiveUserMessageIsDeleted,
     };
   }
 
@@ -107,6 +114,10 @@ class MessageModel {
       mediaUrl: json['mediaUrl'] as String?,
       mediaSize: json['mediaSize'] as String?,
       voiceDuration: json['voiceDuration'] as int?,
+      deleteForEveryone: json['deleteForEveryone'] as bool? ?? false,
+      sentUserMessageIsDeleted: json['sentUserMessageIsDeleted'] as bool? ?? false,
+      receiveUserMessageIsDeleted:
+          json['receiveUserMessageIsDeleted'] as bool? ?? false,
     );
   }
 }

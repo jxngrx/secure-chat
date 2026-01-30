@@ -115,7 +115,7 @@ class LocationService {
         return;
       }
 
-      await _apiClient.post('/location/update', {
+      await _apiClient.post('/location/update-simple', {
         'latitude': location['latitude'],
         'longitude': location['longitude'],
         'accuracy': location['accuracy'],

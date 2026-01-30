@@ -27,12 +27,12 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  int _selectedTab = 3; // 0: Contacts, 1: Calls, 2: Chats, 3: Settings
+  int _selectedTab = 2; // 0: Calls, 1: Chats, 2: Settings
   bool _isLoading = true;
   bool _isLoadingDevices = false;
   bool _isLoadingSessions = false;
   bool _isDevicesExpanded = false; // Track if devices section is expanded
-  
+
   Map<String, dynamic>? _userProfile;
   List<Map<String, dynamic>> _devices = [];
   List<Map<String, dynamic>> _sessions = [];
@@ -82,7 +82,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       // Load fresh data from API
       final profile = await _apiService.getProfile();
-      
+
       // Update local storage
       final userModel = UserModel.fromJson(profile);
       await _localStorage.write(
@@ -170,10 +170,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     try {
       await _apiService.deactivateSession(sessionId);
-      
+
       // Reload sessions
       await _loadSessions();
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -266,7 +266,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     try {
       await _apiService.deactivateAllSessions();
-      
+
       // Clear local data
       await _secureStorage.deleteAll();
       await _localStorage.clear();
@@ -307,16 +307,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
 
     switch (index) {
-      case 0: // Contacts
-        Navigator.pushReplacementNamed(context, RouteNames.contacts);
-        break;
-      case 1: // Calls
+      case 0: // Calls
         Navigator.pushReplacementNamed(context, RouteNames.calls);
         break;
-      case 2: // Chats
+      case 1: // Chats
         Navigator.pushReplacementNamed(context, RouteNames.chatList);
         break;
-      case 3: // Settings
+      case 2: // Settings
         // Already on settings, do nothing
         break;
     }
@@ -543,7 +540,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     },
                   ),
                   const SizedBox(height: 12),
-                  
+
                   // Devices Section
                   _buildDevicesSectionHeader(isDark),
                   if (_isDevicesExpanded) ...[
@@ -551,7 +548,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _buildDevicesSection(isDark, surfaceColor),
                   ],
                   const SizedBox(height: 24),
-                  
+
                   // Log Out Button
                   _buildActionButton(
                     isDark: isDark,
@@ -562,7 +559,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onTap: _handleLogout,
                   ),
                   const SizedBox(height: 12),
-                  
+
                   // Log Out All Devices Button
                   _buildActionButton(
                     isDark: isDark,
@@ -585,7 +582,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildInitialsAvatar(String name) {
     final initials = AvatarUtils.getInitials(name);
     final colorValue = AvatarUtils.getColorForName(name);
-    
+
     return Container(
       decoration: BoxDecoration(
         color: Color(colorValue),
@@ -782,13 +779,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           final platform = device['platform'] as String? ?? 'Unknown';
           final osVersion = device['osVersion'] as String? ?? '';
           final registeredAt = device['registeredAt'] as String?;
-          
+
           // Find session for this device
           final deviceSession = _sessions.firstWhere(
             (session) => session['deviceId'] == deviceId && (session['isActive'] as bool? ?? false),
             orElse: () => <String, dynamic>{},
           );
-          
+
           return _buildDeviceItem(
             isDark: isDark,
             deviceId: deviceId,
@@ -970,10 +967,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildNavItem(Icons.contacts, 'Contacts', 0, isDark),
-          _buildNavItem(Icons.call, 'Calls', 1, isDark),
-          _buildNavItem(Icons.chat_bubble, 'Chats', 2, isDark),
-          _buildNavItem(Icons.settings, 'Settings', 3, isDark),
+          _buildNavItem(Icons.call, 'Calls', 0, isDark),
+          _buildNavItem(Icons.chat_bubble, 'Chats', 1, isDark),
+          _buildNavItem(Icons.settings, 'Settings', 2, isDark),
         ],
       ),
     );

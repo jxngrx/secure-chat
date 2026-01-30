@@ -25,7 +25,7 @@ class CallsScreen extends ConsumerStatefulWidget {
 class _CallsScreenState extends ConsumerState<CallsScreen> {
   final TextEditingController _searchController = TextEditingController();
   int _selectedFilter = 0; // 0: All, 1: Missed
-  int _selectedTab = 1; // 0: Contacts, 1: Calls, 2: Chats, 3: Settings
+  int _selectedTab = 0; // 0: Calls, 1: Chats, 2: Settings
   List<CallItemModel> _calls = [];
 
   @override
@@ -52,16 +52,13 @@ class _CallsScreenState extends ConsumerState<CallsScreen> {
     }
 
     switch (index) {
-      case 0: // Contacts
-        Navigator.pushReplacementNamed(context, RouteNames.contacts);
-        break;
-      case 1: // Calls
+      case 0: // Calls
         // Already on calls, do nothing
         break;
-      case 2: // Chats
+      case 1: // Chats
         Navigator.pushReplacementNamed(context, RouteNames.chatList);
         break;
-      case 3: // Settings
+      case 2: // Settings
         Navigator.pushReplacementNamed(context, RouteNames.settings);
         break;
     }
@@ -517,10 +514,9 @@ class _CallsScreenState extends ConsumerState<CallsScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildNavItem(Icons.contacts, 'Contacts', 0, isDark),
-          _buildNavItem(Icons.call, 'Calls', 1, isDark),
-          _buildNavItem(Icons.chat_bubble, 'Chats', 2, isDark),
-          _buildNavItem(Icons.settings, 'Settings', 3, isDark),
+          _buildNavItem(Icons.call, 'Calls', 0, isDark),
+          _buildNavItem(Icons.chat_bubble, 'Chats', 1, isDark),
+          _buildNavItem(Icons.settings, 'Settings', 2, isDark),
         ],
       ),
     );

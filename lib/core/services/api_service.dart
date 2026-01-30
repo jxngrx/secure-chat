@@ -13,10 +13,10 @@ import '../services/device_info_service.dart';
 import '../utils/logger.dart';
 
 /// Centralized API Service
-/// 
+///
 /// This service provides a single interface for all backend API calls.
 /// It wraps existing data sources and adds missing endpoints.
-/// 
+///
 /// Usage:
 /// ```dart
 /// final apiService = ApiService.instance;
@@ -43,48 +43,68 @@ class ApiService {
   // AUTHENTICATION
   // ============================================================================
 
-  /// Request OTP for phone number
-  /// 
-  /// [phoneNumber] - Phone number in E.164 format (e.g., +1234567890)
-  Future<void> requestOtp(String phoneNumber) async {
+  /// Register a new user
+  ///
+  /// Returns: { token, user, session }
+  Future<Map<String, dynamic>> register({
+    String? username,
+    required String password,
+    required String deviceId,
+    String? phone,
+  }) async {
     try {
-      await _authDS.requestOtp(phoneNumber);
+      return await _authDS.register(
+        username: username,
+        password: password,
+        deviceId: deviceId,
+        phone: phone,
+      );
     } catch (e) {
-      Logger.e('Error requesting OTP', e);
+      Logger.e('Error registering user', e);
       rethrow;
     }
   }
 
-  /// Verify OTP and authenticate user
-  /// 
+  /// Login user
+  ///
   /// Returns: { token, user, session }
-  Future<Map<String, dynamic>> verifyOtp({
-    required String phoneNumber,
-    required String otp,
-    String? deviceId,
-    Map<String, dynamic>? location,
+  Future<Map<String, dynamic>> login({
+    required String username,
+    required String password,
+    required String deviceId,
   }) async {
     try {
-      return await _authDS.verifyOtp(
-        phoneNumber: phoneNumber,
-        otp: otp,
+      return await _authDS.login(
+        username: username,
+        password: password,
         deviceId: deviceId,
-        location: location,
       );
     } catch (e) {
-      Logger.e('Error verifying OTP', e);
+      Logger.e('Error logging in', e);
       rethrow;
     }
   }
 
   /// Update username
-  /// 
+  ///
   /// [username] - New username (3-30 chars, alphanumeric + underscores)
   Future<Map<String, dynamic>> updateUsername(String username) async {
     try {
       return await _authDS.updateUsername(username);
     } catch (e) {
       Logger.e('Error updating username', e);
+      rethrow;
+    }
+  }
+
+  /// Update phone number
+  ///
+  /// [phone] - New phone number (E.164 format preferred)
+  Future<Map<String, dynamic>> updatePhone(String phone) async {
+    try {
+      return await _authDS.updatePhone(phone);
+    } catch (e) {
+      Logger.e('Error updating phone', e);
       rethrow;
     }
   }
@@ -104,7 +124,7 @@ class ApiService {
   }
 
   /// Search users by phone or username
-  /// 
+  ///
   /// [query] - Search query:
   ///   - 10 digits: searches phone only
   ///   - +12 digits: searches phone only (extracts last 10 digits)
@@ -129,9 +149,9 @@ class ApiService {
   }
 
   /// Check if username is available
-  /// 
+  ///
   /// [username] - Username to check (3-30 chars, alphanumeric + underscores)
-  /// 
+  ///
   /// Returns: true if available, false if taken or invalid
   Future<bool> checkUsernameAvailability(String username) async {
     try {
@@ -147,7 +167,7 @@ class ApiService {
   // ============================================================================
 
   /// Register or update device
-  /// 
+  ///
   /// [deviceId] - Device UUID (auto-generated if not provided)
   /// [deviceModel] - Device model name
   /// [manufacturer] - Device manufacturer
@@ -201,7 +221,7 @@ class ApiService {
   }
 
   /// Get device by deviceId
-  /// 
+  ///
   /// [deviceId] - Device UUID
   Future<Map<String, dynamic>> getDeviceById(String deviceId) async {
     try {
@@ -218,7 +238,7 @@ class ApiService {
   // ============================================================================
 
   /// Create new session
-  /// 
+  ///
   /// [deviceId] - Device UUID
   /// [loginMethod] - 'phone' or 'google'
   /// [location] - Optional location data { latitude, longitude, accuracy }
@@ -274,9 +294,9 @@ class ApiService {
   // ============================================================================
 
   /// Update last known location
-  /// 
+  ///
   /// Backend automatically fetches most recent active session if not provided in headers.
-  /// 
+  ///
   /// [latitude] - Latitude (-90 to 90)
   /// [longitude] - Longitude (-180 to 180)
   /// [accuracy] - Accuracy in meters (optional)
@@ -294,7 +314,7 @@ class ApiService {
         payload['accuracy'] = accuracy;
       }
 
-      await _apiClient.post('/location/update', payload);
+      await _apiClient.post('/location/update-simple', payload);
     } catch (e) {
       Logger.e('Error updating location', e);
       rethrow;
@@ -312,12 +332,12 @@ class ApiService {
   }
 
   /// Start live location sharing
-  /// 
+  ///
   /// [chatId] - Optional chat ID for sharing in specific chat
   /// [latitude] - Initial latitude
   /// [longitude] - Initial longitude
   /// [accuracy] - Accuracy in meters
-  /// 
+  ///
   /// Returns: { liveSessionId, latitude, longitude, accuracy, timestamp, isLive }
   Future<Map<String, dynamic>> startLiveLocation({
     String? chatId,
@@ -339,7 +359,7 @@ class ApiService {
   }
 
   /// Update live location (call every 10-15 seconds)
-  /// 
+  ///
   /// [liveSessionId] - Live location session ID from startLiveLocation
   /// [latitude] - Current latitude
   /// [longitude] - Current longitude
@@ -364,7 +384,7 @@ class ApiService {
   }
 
   /// Stop live location sharing
-  /// 
+  ///
   /// [liveSessionId] - Live location session ID
   Future<void> stopLiveLocation(String liveSessionId) async {
     try {
@@ -380,11 +400,11 @@ class ApiService {
   // ============================================================================
 
   /// Sync contacts with backend
-  /// 
+  ///
   /// Phone numbers are automatically hashed with SHA-256 before sending.
-  /// 
+  ///
   /// [phoneNumbers] - List of phone numbers in E.164 format
-  /// 
+  ///
   /// Returns: List of matched contacts
   Future<List<Map<String, dynamic>>> syncContacts(List<String> phoneNumbers) async {
     try {
@@ -410,7 +430,7 @@ class ApiService {
   // ============================================================================
 
   /// Get all chats for current user
-  /// 
+  ///
   /// Returns: List of chats sorted by lastMessageAt (most recent first)
   Future<List<Map<String, dynamic>>> getChats() async {
     try {
@@ -422,7 +442,7 @@ class ApiService {
   }
 
   /// Get chat by ID
-  /// 
+  ///
   /// [chatId] - Chat ID (format: "userId1_userId2")
   Future<Map<String, dynamic>> getChatById(String chatId) async {
     try {
@@ -434,9 +454,9 @@ class ApiService {
   }
 
   /// Create or get existing chat with another user
-  /// 
+  ///
   /// [otherUserId] - Other user's ID
-  /// 
+  ///
   /// Returns: Chat object with participants populated
   Future<Map<String, dynamic>> createOrGetChat(String otherUserId) async {
     try {
@@ -452,11 +472,11 @@ class ApiService {
   // ============================================================================
 
   /// Send message via REST API
-  /// 
+  ///
   /// [chatId] - Chat ID
   /// [type] - Message type: 'text', 'image', 'video', 'voice', 'file'
   /// [content] - Message content (text or file URL for media)
-  /// 
+  ///
   /// Returns: Message object
   Future<Map<String, dynamic>> sendMessage({
     required String chatId,
@@ -476,11 +496,11 @@ class ApiService {
   }
 
   /// Get chat messages with pagination
-  /// 
+  ///
   /// [chatId] - Chat ID
   /// [limit] - Number of messages to fetch (default: 50)
   /// [before] - Message ID to fetch messages before (for pagination)
-  /// 
+  ///
   /// Returns: List of messages (oldest first)
   Future<List<Map<String, dynamic>>> getChatMessages({
     required String chatId,
@@ -500,7 +520,7 @@ class ApiService {
   }
 
   /// Mark all unread messages in chat as read
-  /// 
+  ///
   /// [chatId] - Chat ID
   Future<void> markAsRead(String chatId) async {
     try {
@@ -512,7 +532,7 @@ class ApiService {
   }
 
   /// Mark all undelivered messages in chat as delivered
-  /// 
+  ///
   /// [chatId] - Chat ID
   Future<void> markAsDelivered(String chatId) async {
     try {
@@ -524,12 +544,12 @@ class ApiService {
   }
 
   /// Edit message
-  /// 
+  ///
   /// Only works if message is unread and within 30 minutes of creation.
-  /// 
+  ///
   /// [messageId] - Message ID
   /// [content] - New message content
-  /// 
+  ///
   /// Returns: Updated message object
   Future<Map<String, dynamic>> editMessage({
     required String messageId,
@@ -547,7 +567,7 @@ class ApiService {
   }
 
   /// Delete message
-  /// 
+  ///
   /// [messageId] - Message ID
   /// [deleteForEveryone] - If true, permanently deletes (only if unread).
   ///                      If false, soft deletes (adds to deletedFor array).
@@ -571,9 +591,9 @@ class ApiService {
   // ============================================================================
 
   /// Initiate call
-  /// 
+  ///
   /// [receiverId] - Receiver's user ID
-  /// 
+  ///
   /// Returns: { id, caller, receiver, status, rtcConfig }
   Future<Map<String, dynamic>> initiateCall(String receiverId) async {
     try {
@@ -585,9 +605,9 @@ class ApiService {
   }
 
   /// Answer call
-  /// 
+  ///
   /// [callId] - Call ID
-  /// 
+  ///
   /// Returns: Call object with updated status
   Future<Map<String, dynamic>> answerCall(String callId) async {
     try {
@@ -599,7 +619,7 @@ class ApiService {
   }
 
   /// Reject call
-  /// 
+  ///
   /// [callId] - Call ID
   Future<void> rejectCall(String callId) async {
     try {
@@ -611,9 +631,9 @@ class ApiService {
   }
 
   /// End call
-  /// 
+  ///
   /// [callId] - Call ID
-  /// 
+  ///
   /// Returns: Call object with duration calculated
   Future<Map<String, dynamic>> endCall(String callId) async {
     try {
@@ -625,9 +645,9 @@ class ApiService {
   }
 
   /// Get call history
-  /// 
+  ///
   /// [limit] - Number of calls to fetch (default: 50)
-  /// 
+  ///
   /// Returns: List of calls (most recent first)
   Future<List<Map<String, dynamic>>> getCallHistory({int limit = 50}) async {
     try {
@@ -643,9 +663,9 @@ class ApiService {
   // ============================================================================
 
   /// Upload file
-  /// 
+  ///
   /// [file] - File to upload (max 10MB)
-  /// 
+  ///
   /// Returns: { url, filename, size, mimetype }
   Future<Map<String, dynamic>> uploadFile(File file) async {
     try {
@@ -657,7 +677,7 @@ class ApiService {
   }
 
   /// Delete file
-  /// 
+  ///
   /// [url] - File URL to delete
   Future<void> deleteFile(String url) async {
     try {
@@ -673,7 +693,7 @@ class ApiService {
   // ============================================================================
 
   /// Health check endpoint
-  /// 
+  ///
   /// Returns: { status: "ok", timestamp: "..." }
   Future<Map<String, dynamic>> healthCheck() async {
     try {

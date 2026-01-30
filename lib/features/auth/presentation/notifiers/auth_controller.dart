@@ -1,27 +1,72 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
+import '../../../../core/constants/storage_keys.dart';
 import '../../../../core/services/background_service_manager.dart';
+import '../../../../core/storage/secure_storage.dart';
 import '../../../../core/utils/logger.dart';
 import '../../../../di/injection_container.dart';
-import '../../../device/domain/entities/device_entity.dart';
 import '../../../session/domain/entities/session_entity.dart';
+import '../../../session/domain/repositories/session_repository.dart';
 import '../../domain/repositories/auth_repository.dart';
 import 'auth_state.dart';
 
 class AuthController extends StateNotifier<AuthState> {
-  AuthController(this._repository) : super(AuthState.initial());
+  AuthController(this._repository, this._sessionRepository) : super(AuthState.initial());
 
   final AuthRepository _repository;
+  final SessionRepository _sessionRepository;
+  final Uuid _uuid = const Uuid();
 
-  Future<void> requestOtp(String phoneNumber) async {
+  Future<String> _getDeviceId() async {
+    final storage = SecureStorage.instance;
+    String? deviceId = await storage.read(StorageKeys.deviceId);
+    if (deviceId == null || deviceId.isEmpty) {
+      deviceId = _uuid.v4();
+      await storage.write(StorageKeys.deviceId, deviceId);
+    }
+    return deviceId;
+  }
+
+  Future<void> register({
+    String? username,
+    required String password,
+    String? phone,
+  }) async {
     state = state.copyWith(
-      status: AuthStatus.otpSending,
-      phoneNumber: phoneNumber,
+      status: AuthStatus.loading,
       clearError: true,
     );
     try {
-      await _repository.requestOtp(phoneNumber);
-      state = state.copyWith(status: AuthStatus.otpSent);
+      final deviceId = await _getDeviceId();
+      final result = await _repository.register(
+        username: username,
+        password: password,
+        deviceId: deviceId,
+        phone: phone,
+      );
+
+      // Create session if not returned
+      SessionEntity? session = result.session;
+      if (session == null) {
+        try {
+          session = await _sessionRepository.createSession(
+            deviceId: deviceId,
+            loginMethod: 'phone', // Defaulting to phone as per API convention
+          );
+          // Save sessionId to secure storage
+          await SecureStorage.instance.write(StorageKeys.sessionId, session.sessionId);
+        } catch (e) {
+          Logger.e('Failed to create session after register', e);
+        }
+      }
+
+      state = state.copyWith(
+        status: AuthStatus.authenticated,
+        user: result.user,
+        session: session,
+      );
+      _initializeBackgroundServices();
     } catch (error) {
       state = state.copyWith(
         status: AuthStatus.error,
@@ -30,44 +75,58 @@ class AuthController extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> verifyOtp({
-    required String phoneNumber,
-    required String otp,
-    DeviceEntity? device,
-    Map<String, dynamic>? location,
+  Future<void> login({
+    required String username,
+    required String password,
   }) async {
     state = state.copyWith(
-      status: AuthStatus.verifyingOtp,
+      status: AuthStatus.loading,
       clearError: true,
     );
     try {
-      final result = await _repository.verifyOtp(
-        phoneNumber: phoneNumber,
-        otp: otp,
-        deviceId: device?.deviceId,
-        location: location,
-      );
-      state = state.copyWith(
-        status: AuthStatus.otpVerified,
-        user: result.user,
-        session: result.session,
+      final deviceId = await _getDeviceId();
+      final result = await _repository.login(
+        username: username,
+        password: password,
+        deviceId: deviceId,
       );
 
-      // Initialize background services after successful authentication
-      try {
-        final backgroundServiceManager =
-            InjectionContainer.resolve<BackgroundServiceManager>();
-        await backgroundServiceManager.initializeServices();
-      } catch (e) {
-        // Log error but don't fail authentication
-        // Background services can be initialized later
-        Logger.w('Error initializing background services: $e');
+      // Create session if not returned
+      SessionEntity? session = result.session;
+      if (session == null) {
+        try {
+          session = await _sessionRepository.createSession(
+            deviceId: deviceId,
+            loginMethod: 'phone', // Defaulting to phone as per API convention
+          );
+          // Save sessionId to secure storage
+          await SecureStorage.instance.write(StorageKeys.sessionId, session.sessionId);
+        } catch (e) {
+          Logger.e('Failed to create session after login', e);
+        }
       }
+
+      state = state.copyWith(
+        status: AuthStatus.authenticated,
+        user: result.user,
+        session: session,
+      );
+      _initializeBackgroundServices();
     } catch (error) {
       state = state.copyWith(
         status: AuthStatus.error,
         errorMessage: error.toString(),
       );
+    }
+  }
+
+  Future<void> _initializeBackgroundServices() async {
+    try {
+      final backgroundServiceManager =
+          InjectionContainer.resolve<BackgroundServiceManager>();
+      await backgroundServiceManager.initializeServices();
+    } catch (e) {
+      Logger.w('Error initializing background services: $e');
     }
   }
 

@@ -25,12 +25,12 @@ class Env {
 
   static final Map<Environment, EnvConfig> _envConfigs = {
     Environment.dev: const EnvConfig(
-      apiBaseUrl: 'https://willard-ungrainable-subcortically.ngrok-free.dev',
-      socketUrl: 'https://willard-ungrainable-subcortically.ngrok-free.dev',
+      apiBaseUrl: 'https://chatapp.jxngrx.in',
+      socketUrl: 'https://chatapp.jxngrx.in',
     ),
     Environment.prod: const EnvConfig(
-      apiBaseUrl: 'https://willard-ungrainable-subcortically.ngrok-free.dev',
-      socketUrl: 'https://willard-ungrainable-subcortically.ngrok-free.dev',
+      apiBaseUrl: 'https://chatapp.jxngrx.in',
+      socketUrl: 'https://chatapp.jxngrx.in',
     ),
   };
 

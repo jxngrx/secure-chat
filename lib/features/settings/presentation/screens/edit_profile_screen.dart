@@ -25,7 +25,9 @@ class EditProfileScreen extends StatefulWidget {
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
   final FocusNode _usernameFocusNode = FocusNode();
+  final FocusNode _phoneFocusNode = FocusNode();
 
   bool _isLoading = false;
   bool _isLoadingProfile = true;
@@ -54,6 +56,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void dispose() {
     _usernameController.dispose();
     _usernameFocusNode.dispose();
+    _phoneController.dispose();
+    _phoneFocusNode.dispose();
     super.dispose();
   }
 
@@ -66,6 +70,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         setState(() {
           _userProfile = profile;
           _usernameController.text = userModel.username ?? '';
+          _phoneController.text = userModel.phone ?? '';
           _currentAvatarUrl = profile['avatarUrl'] as String?;
           _isLoadingProfile = false;
         });
@@ -212,7 +217,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     // Check if username changed
     final currentUsername = _userProfile?['username'] as String? ?? '';
-    if (username == currentUsername && _selectedImage == null && _selectedImageBytes == null) {
+    final phone = _phoneController.text.trim();
+    final currentPhone = _userProfile?['phone'] as String? ?? '';
+
+    if (username == currentUsername && phone == currentPhone && _selectedImage == null && _selectedImageBytes == null) {
       // No changes
       Navigator.pop(context);
       return;
@@ -234,6 +242,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           StorageKeys.userProfile,
           jsonEncode(userModel.toJson()),
         );
+      }
+
+      // Update phone if changed
+      final phone = _phoneController.text.trim();
+      final currentPhone = _userProfile?['phone'] as String? ?? '';
+      if (phone.isNotEmpty && phone != currentPhone) {
+        await _apiService.updatePhone(phone);
+
+        // Refresh local storage again if needed, or if username wasn't changed
+        if (username == currentUsername) {
+          final updatedProfile = await _apiService.getProfile();
+          final userModel = UserModel.fromJson(updatedProfile);
+          await _localStorage.write(
+            StorageKeys.userProfile,
+            jsonEncode(userModel.toJson()),
+          );
+        }
       }
 
       // TODO: Upload avatar if image selected
@@ -347,6 +372,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   // Username Input
                   _buildUsernameInput(isDark, surfaceColor, borderColor),
                   const SizedBox(height: 24),
+
+                  // Phone Input
+                  _buildPhoneInput(isDark, surfaceColor, borderColor),
+                  const SizedBox(height: 24),
                 ],
               ),
             ),
@@ -392,7 +421,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget _buildInitialsAvatar(String name) {
     final initials = AvatarUtils.getInitials(name);
     final colorValue = AvatarUtils.getColorForName(name);
-    
+
     return Container(
       decoration: BoxDecoration(
         color: Color(colorValue),
@@ -540,6 +569,89 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ],
             ),
           ),
+      ],
+    );
+  }
+
+  Widget _buildPhoneInput(bool isDark, Color surfaceColor, Color borderColor) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            'PHONE NUMBER',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.2,
+              color: isDark ? const Color(0xFF92ADC9) : const Color(0xFF64748B),
+            ),
+          ),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: surfaceColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _phoneFocusNode.hasFocus
+                  ? AppColors.primary
+                  : borderColor,
+              width: _phoneFocusNode.hasFocus ? 2 : 1,
+            ),
+            boxShadow: _phoneFocusNode.hasFocus
+                ? [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.3),
+                      blurRadius: 15,
+                      spreadRadius: 0,
+                    ),
+                  ]
+                : [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+          ),
+          child: Row(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(left: 16),
+                child: Icon(
+                  Icons.phone,
+                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  size: 20,
+                ),
+              ),
+              Expanded(
+                child: TextField(
+                  controller: _phoneController,
+                  focusNode: _phoneFocusNode,
+                  enabled: !_isLoading,
+                  keyboardType: TextInputType.phone,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontFamily: 'monospace',
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Phone Number',
+                    hintStyle: TextStyle(
+                      color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                    ),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 16,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }

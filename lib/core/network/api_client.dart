@@ -40,10 +40,10 @@ class ApiClient {
           options.headers['Authorization'] = 'Bearer $token';
         }
         if (sessionId != null) {
-          options.headers['x-session-id'] = sessionId;
+          options.headers['X-Session-Id'] = sessionId;
         }
         if (deviceId != null) {
-          options.headers['x-device-id'] = deviceId;
+          options.headers['X-Device-Id'] = deviceId;
         }
 
         Logger.d('[API] => ${options.method} ${options.uri}');

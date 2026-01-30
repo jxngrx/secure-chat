@@ -12,25 +12,22 @@ class WelcomeScreen extends StatefulWidget {
 
 class _WelcomeScreenState extends State<WelcomeScreen>
     with SingleTickerProviderStateMixin {
-  late AnimationController _shimmerController;
-
   @override
   void initState() {
     super.initState();
-    _shimmerController = AnimationController(
-      duration: const Duration(milliseconds: 2000),
-      vsync: this,
-    )..repeat();
   }
 
   @override
   void dispose() {
-    _shimmerController.dispose();
     super.dispose();
   }
 
-  void _handleStartMessaging() {
-    Navigator.pushNamed(context, RouteNames.phoneInput);
+  void _handleRegister() {
+    Navigator.pushNamed(context, RouteNames.register);
+  }
+
+  void _handleLogin() {
+    Navigator.pushNamed(context, RouteNames.login);
   }
 
   @override
@@ -358,10 +355,53 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       ),
                       const SizedBox(height: 32),
 
-                      // Start Messaging Button
-                      _ShimmerButton(
-                        controller: _shimmerController,
-                        onPressed: _handleStartMessaging,
+                      // Auth Buttons
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: _handleLogin,
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                side: BorderSide(
+                                  color: isDark ? Colors.white : Colors.black87,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text(
+                                'Login',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? Colors.white : Colors.black87,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: _handleRegister,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const Text(
+                                'Register',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 16),
 
@@ -389,94 +429,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         ),
       ),
       ),
-    );
-  }
-}
-
-class _ShimmerButton extends StatelessWidget {
-  final AnimationController controller;
-  final VoidCallback onPressed;
-
-  const _ShimmerButton({
-    required this.controller,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, child) {
-        return Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onPressed,
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              height: 56,
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withOpacity(0.25),
-                    blurRadius: 20,
-                    spreadRadius: 0,
-                  ),
-                ],
-              ),
-              child: Stack(
-                children: [
-                  // Shimmer effect
-                  Positioned.fill(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: AnimatedBuilder(
-                        animation: controller,
-                        builder: (context, child) {
-                          return Transform.translate(
-                            offset: Offset(
-                              (controller.value * 2 - 1) *
-                                  MediaQuery.of(context).size.width,
-                              0,
-                            ),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.centerLeft,
-                                  end: Alignment.centerRight,
-                                  colors: [
-                                    Colors.transparent,
-                                    Colors.white.withOpacity(0.1),
-                                    Colors.transparent,
-                                  ],
-                                  stops: const [0.0, 0.5, 1.0],
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                  // Button text
-                  Center(
-                    child: Text(
-                      'Start Messaging',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
     );
   }
 }

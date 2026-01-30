@@ -112,6 +112,7 @@ class MessageController extends StateNotifier<MessageState> {
     });
 
     // Listen for message sent confirmation
+    // Listen for message sent confirmation
     _socketDataSource.onMessageSent((data) {
       try {
         final message = MessageEntity(
@@ -169,6 +170,85 @@ class MessageController extends StateNotifier<MessageState> {
         state = state.copyWith(messages: currentMessages);
       } catch (e) {
         Logger.e('Error handling message sent confirmation', e);
+      }
+    });
+
+    // Listen for message deleted event
+    _socketDataSource.onMessageDeleted((data) {
+      try {
+        final messageId = data['messageId'] as String;
+        final chatId = data['chatId'] as String;
+        final deleteForEveryone = data['deleteForEveryone'] as bool? ?? false;
+        final sentUserMessageIsDeleted = data['sentUserMessageIsDeleted'] as bool? ?? false;
+        final receiveUserMessageIsDeleted = data['receiveUserMessageIsDeleted'] as bool? ?? false;
+
+        // Get current user ID (synchronously since we might not await here inside callback)
+        // Ideally we should have userId in state or accessible synchronously
+        // For now, we update the message entity in the list
+
+        final currentMessages = Map<String, List<MessageEntity>>.from(state.messages);
+        final chatMessages = List<MessageEntity>.from(currentMessages[chatId] ?? []);
+        final index = chatMessages.indexWhere((m) => m.id == messageId);
+
+        if (index != -1) {
+          final oldMessage = chatMessages[index];
+
+          if (deleteForEveryone) {
+            // Update message to show as deleted
+            chatMessages[index] = MessageEntity(
+              id: oldMessage.id,
+              chatId: oldMessage.chatId,
+              senderId: oldMessage.senderId,
+              senderName: oldMessage.senderName,
+              senderAvatar: oldMessage.senderAvatar,
+              content: 'This message was deleted', // Placeholder content
+              type: oldMessage.type,
+              timestamp: oldMessage.timestamp,
+              status: oldMessage.status,
+              editedAt: oldMessage.editedAt,
+              mediaUrl: oldMessage.mediaUrl,
+              mediaSize: oldMessage.mediaSize,
+              voiceDuration: oldMessage.voiceDuration,
+              deleteForEveryone: true,
+              sentUserMessageIsDeleted: true, // Sender deleted for everyone implies this
+              receiveUserMessageIsDeleted: receiveUserMessageIsDeleted,
+            );
+          } else {
+            // "Delete for me" only logic is tricky without knowing "me".
+            // The socket event should ideally only come if it affects "me" or everyone.
+            // If we receive this event, it means the message metadata changed.
+            // We should update the tags.
+            // The UI will determine if it should be hidden based on the tags and currentUserId.
+
+            chatMessages[index] = MessageEntity(
+              id: oldMessage.id,
+              chatId: oldMessage.chatId,
+              senderId: oldMessage.senderId,
+              senderName: oldMessage.senderName,
+              senderAvatar: oldMessage.senderAvatar,
+              content: oldMessage.content,
+              type: oldMessage.type,
+              timestamp: oldMessage.timestamp,
+              status: oldMessage.status,
+              editedAt: oldMessage.editedAt,
+              mediaUrl: oldMessage.mediaUrl,
+              mediaSize: oldMessage.mediaSize,
+              voiceDuration: oldMessage.voiceDuration,
+              deleteForEveryone: false,
+              sentUserMessageIsDeleted: sentUserMessageIsDeleted,
+              receiveUserMessageIsDeleted: receiveUserMessageIsDeleted,
+            );
+
+            // NOTE: We don't remove it here because we don't know "who" deleted it relative to "us" (sender/receiver)
+            // inside this callback easily without async profile fetch.
+            // The UI will filter it out if needed.
+          }
+
+          currentMessages[chatId] = chatMessages;
+          state = state.copyWith(messages: currentMessages);
+        }
+      } catch (e) {
+        Logger.e('Error handling message deleted event', e);
       }
     });
   }
@@ -236,14 +316,14 @@ class MessageController extends StateNotifier<MessageState> {
           if (userProfileJson != null && userProfileJson.isNotEmpty) {
             final userProfile = jsonDecode(userProfileJson) as Map<String, dynamic>;
             currentUserId = userProfile['id'] as String?;
-            
+
             // Update optimistic message with user ID
             final updatedMessages = Map<String, List<MessageEntity>>.from(state.messages);
             final updatedChatMessages = List<MessageEntity>.from(updatedMessages[chatId] ?? []);
             final optimisticIndex = updatedChatMessages.indexWhere((m) => m.id == optimisticId);
             if (optimisticIndex != -1 && currentUserId != null && currentUserId!.isNotEmpty) {
               updatedChatMessages[optimisticIndex] = MessageEntity(
-                id: optimisticId!,
+                id: optimisticId,
                 chatId: chatId,
                 senderId: currentUserId!,
                 content: content,
@@ -375,34 +455,52 @@ class MessageController extends StateNotifier<MessageState> {
 
       final currentMessages = Map<String, List<MessageEntity>>.from(state.messages);
       final chatMessages = List<MessageEntity>.from(currentMessages[chatId] ?? []);
-      
-      if (deleteForEveryone) {
-        // Remove message completely if deleted for everyone
-        chatMessages.removeWhere((m) => m.id == messageId);
-      } else {
-        // Mark as deleted for current user
-        final index = chatMessages.indexWhere((m) => m.id == messageId);
-        if (index != -1) {
-          final message = chatMessages[index];
-          chatMessages[index] = MessageEntity(
-            id: message.id,
-            chatId: message.chatId,
-            senderId: message.senderId,
-            senderName: message.senderName,
-            senderAvatar: message.senderAvatar,
-            content: message.content,
-            type: message.type,
-            timestamp: message.timestamp,
-            status: message.status,
-            editedAt: message.editedAt,
-            mediaUrl: message.mediaUrl,
-            mediaSize: message.mediaSize,
-            voiceDuration: message.voiceDuration,
-            isDeleted: true,
+      final index = chatMessages.indexWhere((m) => m.id == messageId);
+
+      if (index != -1) {
+        final oldMessage = chatMessages[index];
+        // We need to know who "we" are to know if we are sender or receiver
+        // But since we initiated the delete action, we know we are the deleter.
+        // However, we don't have our ID here easy access synchronously to check against senderId.
+
+        // Optimistic update:
+        // We will assume backend returns success and socket event will eventually come to sync.
+        // For now, we update local state to reflect what we expect.
+
+        if (deleteForEveryone) {
+           chatMessages[index] = MessageEntity(
+            id: oldMessage.id,
+            chatId: oldMessage.chatId,
+            senderId: oldMessage.senderId,
+            senderName: oldMessage.senderName,
+            senderAvatar: oldMessage.senderAvatar,
+            content: 'This message was deleted',
+            type: oldMessage.type,
+            timestamp: oldMessage.timestamp,
+            status: oldMessage.status,
+            editedAt: oldMessage.editedAt,
+            mediaUrl: oldMessage.mediaUrl,
+            mediaSize: oldMessage.mediaSize,
+            voiceDuration: oldMessage.voiceDuration,
+            deleteForEveryone: true,
+            sentUserMessageIsDeleted: true, // If we can delete for everyone, we must be sender
+            receiveUserMessageIsDeleted: oldMessage.receiveUserMessageIsDeleted,
           );
+        } else {
+          // Delete for me
+          // We mark it as deleted by "us".
+          // But we don't know if we are sender or receiver easily without user ID.
+          // However, the UI filters messages based on these tags + currentUserId.
+          // Since we can't easily set the correct "IsDeleted" tag without knowing if we are sender/receiver,
+          // and we can't easily remove it from list because we don't want to break index if request fails...
+          // A safer bet is to remove it from the list entirely for "delete for me" locally,
+          // matching what the user expects: "it's gone".
+          // If the page refreshes, the backend will return the correct tags and the UI will filter it then.
+
+          chatMessages.removeAt(index);
         }
       }
-      
+
       currentMessages[chatId] = chatMessages;
       state = state.copyWith(messages: currentMessages);
     } catch (e) {

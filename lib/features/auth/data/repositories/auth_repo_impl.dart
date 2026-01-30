@@ -22,43 +22,57 @@ class AuthRepositoryImpl implements AuthRepository {
   final LocalStorage _localStorage;
 
   @override
-  Future<void> requestOtp(String phoneNumber) async {
-    await _remoteDataSource.requestOtp(phoneNumber);
+  Future<AuthResultEntity> register({
+    String? username,
+    required String password,
+    required String deviceId,
+    String? phone,
+  }) async {
+    final response = await _remoteDataSource.register(
+      username: username,
+      password: password,
+      deviceId: deviceId,
+      phone: phone,
+    );
+    return _handleAuthResponse(response, deviceId);
   }
 
   @override
-  Future<AuthResultEntity> verifyOtp({
-    required String phoneNumber,
-    required String otp,
-    String? deviceId,
-    Map<String, dynamic>? location,
+  Future<AuthResultEntity> login({
+    required String username,
+    required String password,
+    required String deviceId,
   }) async {
-    final response = await _remoteDataSource.verifyOtp(
-      phoneNumber: phoneNumber,
-      otp: otp,
+    final response = await _remoteDataSource.login(
+      username: username,
+      password: password,
       deviceId: deviceId,
-      location: location,
     );
+    return _handleAuthResponse(response, deviceId);
+  }
 
+  Future<AuthResultEntity> _handleAuthResponse(
+    Map<String, dynamic> response,
+    String deviceId,
+  ) async {
     final token = response['token'] as String? ?? '';
-    final sessionData = response['session'] as Map<String, dynamic>?;
     final userData = response['user'] as Map<String, dynamic>? ?? {};
 
     final userModel = UserModel.fromJson(userData);
     final userEntity = userModel.toEntity();
 
     await _secureStorage.write(StorageKeys.authToken, token);
-    if (sessionData != null && sessionData['sessionId'] != null) {
-      await _secureStorage.write(
-        StorageKeys.sessionId,
-        sessionData['sessionId'] as String,
-      );
-      if (sessionData['deviceId'] != null) {
-        await _secureStorage.write(
-          StorageKeys.deviceId,
-          sessionData['deviceId'] as String,
-        );
-      }
+    await _secureStorage.write(StorageKeys.deviceId, deviceId);
+
+    // Backend v2.0 guide does not return session object on login/register
+    // creating a dummy session entity or null if not needed strictly
+    // Assuming UI/App needs session entity? current AuthResultEntity needs it?
+    // Let's check AuthResultEntity definition.
+    // If not returned, we can construct a local one or pass null if nullable.
+
+    final sessionId = response['sessionId'] as String?;
+    if (sessionId != null && sessionId.isNotEmpty) {
+      await _secureStorage.write(StorageKeys.sessionId, sessionId);
     }
 
     await _localStorage.write(
@@ -69,17 +83,7 @@ class AuthRepositoryImpl implements AuthRepository {
     return AuthResultEntity(
       token: token,
       user: userEntity,
-      session: sessionData == null
-          ? null
-          : SessionEntity(
-              sessionId: sessionData['sessionId'] as String,
-              deviceId: sessionData['deviceId'] as String? ?? '',
-              loginMethod: sessionData['loginMethod'] as String? ?? 'phone',
-              isActive: sessionData['isActive'] as bool? ?? true,
-              expiresAt: sessionData['expiresAt'] is String
-                  ? DateTime.tryParse(sessionData['expiresAt'] as String)
-                  : null,
-            ),
+      session: null, // Session object details not returned, only ID if any
     );
   }
 

@@ -47,18 +47,18 @@ class _SplashScreenState extends State<SplashScreen>
       // Check if user is authenticated
       final secureStorage = InjectionContainer.resolve<SecureStorage>();
       final localStorage = InjectionContainer.resolve<LocalStorage>();
-      
+
       final authToken = await secureStorage.read(StorageKeys.authToken);
       final sessionId = await secureStorage.read(StorageKeys.sessionId);
 
-      if (authToken != null && authToken.isNotEmpty && sessionId != null && sessionId.isNotEmpty) {
+      if (authToken != null && authToken.isNotEmpty) {
         // User is authenticated, check if they have username
         try {
           final userProfileJson = await localStorage.read(StorageKeys.userProfile);
           if (userProfileJson != null && userProfileJson.isNotEmpty) {
             final userProfile = jsonDecode(userProfileJson) as Map<String, dynamic>;
             final username = userProfile['username'] as String?;
-            
+
             if (mounted) {
               if (username == null || username.isEmpty || username.startsWith('user_')) {
                 // User doesn't have a proper username, navigate to username setup

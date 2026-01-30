@@ -12,7 +12,9 @@ class MessageEntity {
   final String? mediaUrl;
   final String? mediaSize;
   final int? voiceDuration;
-  final bool isDeleted; // Whether message is deleted for current user
+  final bool deleteForEveryone;
+  final bool sentUserMessageIsDeleted;
+  final bool receiveUserMessageIsDeleted;
 
   MessageEntity({
     required this.id,
@@ -28,6 +30,8 @@ class MessageEntity {
     this.mediaUrl,
     this.mediaSize,
     this.voiceDuration,
-    this.isDeleted = false,
+    this.deleteForEveryone = false,
+    this.sentUserMessageIsDeleted = false,
+    this.receiveUserMessageIsDeleted = false,
   });
 }

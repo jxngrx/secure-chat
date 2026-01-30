@@ -1,15 +1,15 @@
 # API Integration Status
 
-**Last Updated:** January 27, 2026  
-**API Base URL:** `https://willard-ungrainable-subcortically.ngrok-free.dev`
+**Last Updated:** January 27, 2026
+**API Base URL:** `https://chatapp.jxngrx.in`
 
 ---
 
 ## ✅ Phase 1: Foundation Complete
 
 ### 1. API Configuration
-- ✅ Updated `lib/core/config/env.dart` with ngrok URL
-- ✅ Both dev and prod environments point to ngrok URL
+- ✅ Updated `lib/core/config/env.dart` with chatapp.jxngrx.in URL
+- ✅ Both dev and prod environments point to chatapp.jxngrx.in URL
 - ✅ Socket URL configured
 
 ### 2. Centralized API Service

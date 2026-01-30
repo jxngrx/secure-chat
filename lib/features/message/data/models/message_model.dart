@@ -15,6 +15,10 @@ class MessageModel {
   final String? mediaSize;
   final int? voiceDuration;
 
+  final bool deleteForEveryone;
+  final bool sentUserMessageIsDeleted;
+  final bool receiveUserMessageIsDeleted;
+
   MessageModel({
     required this.id,
     required this.chatId,
@@ -29,6 +33,9 @@ class MessageModel {
     this.mediaUrl,
     this.mediaSize,
     this.voiceDuration,
+    this.deleteForEveryone = false,
+    this.sentUserMessageIsDeleted = false,
+    this.receiveUserMessageIsDeleted = false,
   });
 
   factory MessageModel.fromJson(Map<String, dynamic> json) {
@@ -62,10 +69,14 @@ class MessageModel {
       mediaUrl: json['mediaUrl'] as String?,
       mediaSize: json['mediaSize'] as String?,
       voiceDuration: json['voiceDuration'] as int?,
+      deleteForEveryone: json['deleteForEveryone'] as bool? ?? false,
+      sentUserMessageIsDeleted: json['sentUserMessageIsDeleted'] as bool? ?? false,
+      receiveUserMessageIsDeleted:
+          json['receiveUserMessageIsDeleted'] as bool? ?? false,
     );
   }
 
-  MessageEntity toEntity({bool isDeleted = false}) {
+  MessageEntity toEntity() {
     return MessageEntity(
       id: id,
       chatId: chatId,
@@ -80,7 +91,9 @@ class MessageModel {
       mediaUrl: mediaUrl,
       mediaSize: mediaSize,
       voiceDuration: voiceDuration,
-      isDeleted: isDeleted,
+      deleteForEveryone: deleteForEveryone,
+      sentUserMessageIsDeleted: sentUserMessageIsDeleted,
+      receiveUserMessageIsDeleted: receiveUserMessageIsDeleted,
     );
   }
 }

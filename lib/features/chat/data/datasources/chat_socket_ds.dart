@@ -83,6 +83,11 @@ class ChatSocketDataSource {
     _socketClient.on('chat:updated', callback);
   }
 
+  /// Listen to message deleted event
+  void onMessageDeleted(Function(dynamic) callback) {
+    _socketClient.on('message:deleted', callback);
+  }
+
   /// Remove all listeners
   void removeAllListeners() {
     _socketClient.off('message:new');
@@ -90,5 +95,6 @@ class ChatSocketDataSource {
     _socketClient.off('message:read');
     _socketClient.off('message:delivered');
     _socketClient.off('chat:updated');
+    _socketClient.off('message:deleted');
   }
 }

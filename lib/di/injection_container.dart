@@ -24,6 +24,8 @@ import '../features/chat/data/repositories/chat_repo_impl.dart';
 import '../features/chat/domain/repositories/chat_repository.dart';
 import '../features/message/data/repositories/message_repo_impl.dart';
 import '../features/message/domain/repositories/message_repository.dart';
+import '../features/session/data/repositories/session_repo_impl.dart';
+import '../features/session/domain/repositories/session_repository.dart';
 
 class InjectionContainer {
   InjectionContainer._();
@@ -153,6 +155,13 @@ class InjectionContainer {
     if (!_getIt.isRegistered<MessageRepository>()) {
       _getIt.registerLazySingleton<MessageRepository>(
         () => MessageRepositoryImpl.instance,
+      );
+    }
+
+    // Session Repository
+    if (!_getIt.isRegistered<SessionRepository>()) {
+      _getIt.registerLazySingleton<SessionRepository>(
+        () => SessionRepositoryImpl.instance,
       );
     }
   }

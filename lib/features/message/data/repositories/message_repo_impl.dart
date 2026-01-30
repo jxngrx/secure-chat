@@ -1,11 +1,7 @@
-import 'dart:convert';
 import '../../domain/repositories/message_repository.dart';
 import '../../domain/entities/message_entity.dart';
 import '../datasources/message_remote_ds.dart';
 import '../models/message_model.dart';
-import '../../../../core/storage/local_storage.dart';
-import '../../../../core/constants/storage_keys.dart';
-import '../../../../di/injection_container.dart';
 
 class MessageRepositoryImpl implements MessageRepository {
   MessageRepositoryImpl._();
@@ -13,20 +9,6 @@ class MessageRepositoryImpl implements MessageRepository {
   static final MessageRepositoryImpl instance = MessageRepositoryImpl._();
 
   final MessageRemoteDataSource _remoteDataSource = MessageRemoteDataSource.instance;
-
-  Future<String?> _getCurrentUserId() async {
-    try {
-      final localStorage = InjectionContainer.resolve<LocalStorage>();
-      final userProfileJson = await localStorage.read(StorageKeys.userProfile);
-      if (userProfileJson != null && userProfileJson.isNotEmpty) {
-        final userProfile = jsonDecode(userProfileJson) as Map<String, dynamic>;
-        return userProfile['id'] as String?;
-      }
-    } catch (e) {
-      // Silently fail
-    }
-    return null;
-  }
 
   @override
   Future<MessageEntity> sendMessage({
@@ -54,16 +36,12 @@ class MessageRepositoryImpl implements MessageRepository {
       limit: limit,
       before: before,
     );
-    final currentUserId = await _getCurrentUserId();
-    
+
+
     return response
         .map((json) {
           final model = MessageModel.fromJson(json);
-          // Check if message is deleted for current user
-          final deletedFor = json['deletedFor'] as List<dynamic>? ?? [];
-          final isDeleted = currentUserId != null && 
-              deletedFor.any((id) => id.toString() == currentUserId);
-          return model.toEntity(isDeleted: isDeleted);
+          return model.toEntity();
         })
         .toList();
   }

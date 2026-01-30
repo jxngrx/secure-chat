@@ -31,7 +31,7 @@ class ChatListScreen extends ConsumerStatefulWidget {
 
 class _ChatListScreenState extends ConsumerState<ChatListScreen> {
   final TextEditingController _searchController = TextEditingController();
-  int _selectedTab = 2; // 0: Contacts, 1: Calls, 2: Chats, 3: Settings
+  int _selectedTab = 1; // 0: Calls, 1: Chats, 2: Settings
   String? _currentUserId;
 
   @override
@@ -95,16 +95,13 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     }
 
     switch (index) {
-      case 0: // Contacts
-        Navigator.pushReplacementNamed(context, RouteNames.contacts);
-        break;
-      case 1: // Calls
+      case 0: // Calls
         Navigator.pushReplacementNamed(context, RouteNames.calls);
         break;
-      case 2: // Chats
+      case 1: // Chats
         // Already on chats, do nothing
         break;
-      case 3: // Settings
+      case 2: // Settings
         Navigator.pushReplacementNamed(context, RouteNames.settings);
         break;
     }
@@ -146,15 +143,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
           ],
         ),
       ),
-      floatingActionButton: Padding(
-        padding: EdgeInsets.only(bottom: fabBottomPadding),
-        child: FloatingActionButton(
-          onPressed: _handleNewChat,
-          backgroundColor: AppColors.primary,
-          child: const Icon(Icons.edit, color: Colors.white),
-        ),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+
       bottomNavigationBar: widget.showBottomNav ? _buildBottomNavigation(isDark) : null,
     );
   }
@@ -178,17 +167,15 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              TextButton(
-                onPressed: () {},
-                child: Text(
-                  'Edit',
-                  style: TextStyle(
-                    color: AppColors.primary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
+              // Placeholder to keep the title centered if needed, or just remove.
+              // For now, I'll just remove it as requested.
+              // If the user wants the title centered, they might need a Spacer or just standard alignment.
+              // But strictly following instruction "remove".
+              // To balance the row if needed, I could use a SizedBox, but purely removing is the direct interpretation.
+              // However, to avoid "Chats" jumping to the extreme left, I might want to check the layout.
+              // Row(mainAxisAlignment: MainAxisAlignment.spaceBetween) with 2 items = Left + Right.
+              // That sounds fine for a standard header.
+              const SizedBox(width: 48), // Balancing the right icon button to keep title somewhat centered
               Text(
                 'Chats',
                 style: TextStyle(
@@ -249,20 +236,20 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
   Widget _buildChatList(bool isDark, List<ChatEntity> chats) {
     // Get messages from message controller to calculate unread count
     final messageState = ref.watch(messageControllerProvider);
-    
+
     // Convert ChatEntity to ChatItemModel for display
     final chatItems = chats.map<ChatItemModel>((chat) {
       // Extract last message content and type
       String? lastMessageContent;
       MessageType? lastMessageType;
       String? lastMessageSender;
-      
+
       if (chat.lastMessage != null) {
         final lastMsg = chat.lastMessage!;
         lastMessageContent = lastMsg['content'] as String?;
         final msgType = lastMsg['type'] as String? ?? 'text';
         lastMessageType = _messageTypeFromString(msgType);
-        
+
         // For group chats, get sender name
         if (chat.isGroup && lastMsg['sender'] != null) {
           final sender = lastMsg['sender'] as Map<String, dynamic>?;
@@ -611,10 +598,9 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildNavItem(Icons.contacts, 'Contacts', 0, isDark),
-          _buildNavItem(Icons.call, 'Calls', 1, isDark),
-          _buildNavItem(Icons.chat_bubble, 'Chats', 2, isDark),
-          _buildNavItem(Icons.settings, 'Settings', 3, isDark),
+          _buildNavItem(Icons.call, 'Calls', 0, isDark),
+          _buildNavItem(Icons.chat_bubble, 'Chats', 1, isDark),
+          _buildNavItem(Icons.settings, 'Settings', 2, isDark),
         ],
       ),
     );

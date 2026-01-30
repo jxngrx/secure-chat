@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'route_names.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/screens/welcome_screen.dart';
-import '../../features/auth/presentation/screens/phone_input_screen.dart';
-import '../../features/auth/presentation/screens/otp_screen.dart';
+
+import '../../features/auth/presentation/screens/login_screen.dart';
+import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/auth/presentation/screens/username_setup_screen.dart';
 import '../../features/contacts/presentation/screens/contact_sync_screen.dart';
 import '../../features/chat/presentation/screens/chat_list_screen.dart';
@@ -30,14 +31,13 @@ class AppRouter {
         return MaterialPageRoute(
           builder: (_) => const WelcomeScreen(),
         );
-      case RouteNames.phoneInput:
+      case RouteNames.login:
         return MaterialPageRoute(
-          builder: (_) => const PhoneInputScreen(),
+          builder: (_) => const LoginScreen(),
         );
-      case RouteNames.otp:
-        final phoneNumber = settings.arguments as String?;
+      case RouteNames.register:
         return MaterialPageRoute(
-          builder: (_) => OtpScreen(phoneNumber: phoneNumber),
+          builder: (_) => const RegisterScreen(),
         );
       case RouteNames.usernameSetup:
         return MaterialPageRoute(

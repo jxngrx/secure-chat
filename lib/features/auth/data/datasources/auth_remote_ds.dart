@@ -5,33 +5,41 @@ class AuthRemoteDataSource {
 
   final ApiClient _apiClient;
 
-  Future<void> requestOtp(String phoneNumber) async {
-    await _apiClient.post('/auth/request-otp', {
-      'phone': phoneNumber,
-    });
-  }
-
-  Future<Map<String, dynamic>> verifyOtp({
-    required String phoneNumber,
-    required String otp,
-    String? deviceId,
-    Map<String, dynamic>? location,
+  Future<Map<String, dynamic>> register({
+    String? username,
+    required String password,
+    required String deviceId,
+    String? phone,
   }) async {
     final payload = <String, dynamic>{
-      'phone': phoneNumber,
-      'otp': otp,
+      'password': password,
+      'deviceId': deviceId,
     };
 
-    if (deviceId != null) {
-      payload['deviceId'] = deviceId;
+    if (username != null) {
+      payload['username'] = username;
     }
-    if (location != null) {
-      payload['location'] = location;
+    if (phone != null) {
+      payload['phone'] = phone;
     }
 
-    final response = await _apiClient.post('/auth/verify-otp', payload);
-    return response['data'] as Map<String, dynamic>?
-        ?? <String, dynamic>{};
+    final response = await _apiClient.post('/auth/register', payload);
+    return response['data'] as Map<String, dynamic>? ?? <String, dynamic>{};
+  }
+
+  Future<Map<String, dynamic>> login({
+    required String username,
+    required String password,
+    required String deviceId,
+  }) async {
+    final payload = <String, dynamic>{
+      'username': username,
+      'password': password,
+      'deviceId': deviceId,
+    };
+
+    final response = await _apiClient.post('/auth/login', payload);
+    return response['data'] as Map<String, dynamic>? ?? <String, dynamic>{};
   }
 
   Future<Map<String, dynamic>> updateUsername(String username) async {
@@ -41,31 +49,16 @@ class AuthRemoteDataSource {
         'username': username,
       },
     );
-    return response['data'] as Map<String, dynamic>?
-        ?? <String, dynamic>{};
+    return response['data'] as Map<String, dynamic>? ?? <String, dynamic>{};
   }
 
-  /// Google OAuth authentication
-  Future<Map<String, dynamic>> googleAuth({
-    required String idToken,
-    required String phone,
-    String? deviceId,
-    Map<String, dynamic>? location,
-  }) async {
-    final payload = <String, dynamic>{
-      'idToken': idToken,
-      'phone': phone,
-    };
-
-    if (deviceId != null) {
-      payload['deviceId'] = deviceId;
-    }
-    if (location != null) {
-      payload['location'] = location;
-    }
-
-    final response = await _apiClient.post('/auth/google', payload);
-    return response['data'] as Map<String, dynamic>?
-        ?? <String, dynamic>{};
+  Future<Map<String, dynamic>> updatePhone(String phone) async {
+    final response = await _apiClient.put(
+      '/users/phone',
+      {
+        'phone': phone,
+      },
+    );
+    return response['data'] as Map<String, dynamic>? ?? <String, dynamic>{};
   }
 }
