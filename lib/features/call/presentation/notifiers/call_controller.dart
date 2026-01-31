@@ -137,9 +137,61 @@ class CallController extends StateNotifier<CallState> {
       // Play ringing sound (dialing tone for caller)
       await _playRingtone('dialing');
 
-      await _repository.initiateCall(receiverId);
+      // Call REST API and process response immediately
+      final response = await _repository.initiateCall(receiverId);
       
-      Logger.d('CallController: Call initiation request sent to $receiverId (isCaller: ${state.isCaller}, initiatedAt: $_lastCallInitiationTime)');
+      Logger.d('CallController: Call initiation response received: $response');
+
+      // Extract call data from REST API response
+      // Handle both string and ObjectId formats
+      String callId = '';
+      if (response['id'] != null) {
+        callId = response['id'].toString();
+      } else if (response['_id'] != null) {
+        callId = response['_id'].toString();
+      }
+      
+      // Extract receiverId from response
+      String responseReceiverId = receiverId; // Default to parameter
+      if (response['receiver'] != null) {
+        final receiverData = response['receiver'] as Map<String, dynamic>?;
+        if (receiverData != null && receiverData['id'] != null) {
+          responseReceiverId = receiverData['id'].toString();
+        }
+      }
+      
+      // Extract status
+      final status = response['status'] as String? ?? 'ringing';
+      
+      // Extract createdAt
+      DateTime startTime = DateTime.now();
+      if (response['createdAt'] != null) {
+        final createdAtStr = response['createdAt'].toString();
+        final parsedTime = DateTime.tryParse(createdAtStr);
+        if (parsedTime != null) {
+          startTime = parsedTime;
+        }
+      }
+      
+      // Create CallEntity from REST response immediately
+      // This ensures callId is available even if socket event is delayed or missing
+      final call = CallEntity(
+        id: callId,
+        callerId: _currentUserId ?? '', // We are the caller
+        receiverId: responseReceiverId,
+        status: status,
+        startTime: startTime,
+      );
+
+      // Update state with callId immediately from REST response
+      // Socket event will arrive as backup/confirmation but we don't wait for it
+      state = state.copyWith(
+        currentCall: call,
+        status: CallStatus.initiating,
+        isCaller: true,
+      );
+      
+      Logger.d('CallController: Call state updated from REST response - callId: $callId, receiverId: $responseReceiverId, isCaller: ${state.isCaller}, initiatedAt: $_lastCallInitiationTime');
     } catch (e) {
       Logger.e('CallController: Error initiating call', e);
       state = state.copyWith(status: CallStatus.error);
@@ -304,18 +356,49 @@ class CallController extends StateNotifier<CallState> {
   }
 
   void _handleCallInitiated(dynamic data) {
-    // data: { callId, receiverId }
-    Logger.d('CallController: Received call:initiated event - callId: ${data['callId']}, receiverId: ${data['receiverId']}, isCaller: ${state.isCaller}');
+    // data: { callId, receiverId, rtcConfig? }
+    final socketCallId = data['callId'] as String?;
+    final socketReceiverId = data['receiverId'] as String?;
+    
+    Logger.d('CallController: Received call:initiated event - callId: $socketCallId, receiverId: $socketReceiverId, isCaller: ${state.isCaller}, currentCallId: ${state.currentCall?.id}');
 
     if (!state.isCaller) {
-      Logger.w('CallController: Ignoring call:initiated - not caller (callId: ${data['callId']}, isCaller: ${state.isCaller})');
+      Logger.w('CallController: Ignoring call:initiated - not caller (callId: $socketCallId, isCaller: ${state.isCaller})');
       return;
     }
 
+    // If we already have a currentCall from REST response, treat socket event as confirmation/backup
+    // Only update if callId matches (confirmation) or if we don't have a callId yet (backup)
+    if (state.currentCall != null && state.currentCall!.id.isNotEmpty) {
+      if (socketCallId == state.currentCall!.id) {
+        Logger.d('CallController: call:initiated socket event confirms REST response - callId: $socketCallId (already set)');
+        // Optionally update receiverId if it's more complete from socket
+        if (socketReceiverId != null && socketReceiverId.isNotEmpty && socketReceiverId != state.currentCall!.receiverId) {
+          final updatedCall = CallEntity(
+            id: state.currentCall!.id,
+            callerId: state.currentCall!.callerId,
+            receiverId: socketReceiverId,
+            status: state.currentCall!.status,
+            startTime: state.currentCall!.startTime,
+            endTime: state.currentCall!.endTime,
+            isVideo: state.currentCall!.isVideo,
+          );
+          state = state.copyWith(currentCall: updatedCall);
+          Logger.d('CallController: Updated receiverId from socket event - new receiverId: $socketReceiverId');
+        }
+        return; // Already have callId from REST, just confirm
+      } else {
+        Logger.w('CallController: call:initiated socket event has different callId - ignoring (REST callId: ${state.currentCall!.id}, socket callId: $socketCallId)');
+        return; // Different callId, ignore
+      }
+    }
+
+    // Backup: If we don't have currentCall yet (shouldn't happen with REST response, but handle gracefully)
+    Logger.d('CallController: Setting call from socket event (backup path) - callId: $socketCallId');
     final call = CallEntity(
-      id: data['callId'],
-      callerId: '', // We are caller
-      receiverId: data['receiverId'],
+      id: socketCallId ?? '',
+      callerId: _currentUserId ?? '', // We are caller
+      receiverId: socketReceiverId ?? _receiverId ?? '',
       status: 'initiating',
       startTime: DateTime.now(),
     );
@@ -324,7 +407,7 @@ class CallController extends StateNotifier<CallState> {
       currentCall: call,
     );
     
-    Logger.d('CallController: Call initiated state updated - callId: ${call.id}, receiverId: ${call.receiverId}');
+    Logger.d('CallController: Call initiated state updated from socket - callId: ${call.id}, receiverId: ${call.receiverId}');
   }
 
   void _handleCallAnswered(dynamic data) {
