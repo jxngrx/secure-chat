@@ -637,7 +637,8 @@ class ApiService {
   /// Returns: Call object with duration calculated
   Future<Map<String, dynamic>> endCall(String callId) async {
     try {
-      return await _callDS.endCall(callId);
+      await _callDS.endCall(callId);
+      return {'success': true};
     } catch (e) {
       Logger.e('Error ending call', e);
       rethrow;

@@ -18,7 +18,7 @@ import '../features/user/data/repositories/user_repo_impl.dart';
 import '../features/user/domain/repositories/user_repository.dart';
 import '../features/contacts/data/repositories/contact_repo_impl.dart';
 import '../features/contacts/domain/repositories/contact_repository.dart';
-import '../features/call/data/repositories/call_repo_impl.dart';
+import '../features/call/data/repositories/call_repository_impl.dart';
 import '../features/call/domain/repositories/call_repository.dart';
 import '../features/chat/data/repositories/chat_repo_impl.dart';
 import '../features/chat/domain/repositories/chat_repository.dart';

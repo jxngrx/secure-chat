@@ -8,6 +8,7 @@ import 'core/utils/logger.dart';
 import 'core/constants/storage_keys.dart';
 import 'core/storage/secure_storage.dart';
 import 'di/injection_container.dart';
+import 'features/call/presentation/widgets/call_global_listener.dart';
 
 class App extends StatefulWidget {
   const App({super.key});
@@ -32,7 +33,7 @@ class _AppState extends State<App> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    
+
     if (state == AppLifecycleState.resumed) {
       // App came to foreground - sync contacts
       _syncContactsOnForeground();
@@ -44,7 +45,7 @@ class _AppState extends State<App> with WidgetsBindingObserver {
       // Check if user is authenticated
       final secureStorage = InjectionContainer.resolve<SecureStorage>();
       final authToken = await secureStorage.read(StorageKeys.authToken);
-      
+
       if (authToken != null && authToken.isNotEmpty) {
         // User is authenticated, sync contacts silently
         Logger.d('App resumed - syncing contacts in background');
@@ -64,6 +65,9 @@ class _AppState extends State<App> with WidgetsBindingObserver {
       themeMode: ThemeMode.system,
       onGenerateRoute: AppRouter.generateRoute,
       initialRoute: RouteNames.splash,
+      builder: (context, child) {
+        return CallGlobalListener(child: child!);
+      },
     );
   }
 }

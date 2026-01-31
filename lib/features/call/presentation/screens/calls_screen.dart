@@ -75,7 +75,7 @@ class _CallsScreenState extends ConsumerState<CallsScreen> {
       return CallItemModel(
         id: call.id,
         name: 'User ${call.receiverId}', // TODO: Get actual user name
-        timestamp: call.createdAt,
+        timestamp: call.startTime,
         type: _mapCallStatusToType(call.status),
         direction: call.callerId == 'current_user' ? CallDirection.outgoing : CallDirection.incoming,
       );

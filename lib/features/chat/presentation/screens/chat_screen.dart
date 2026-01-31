@@ -13,6 +13,8 @@ import '../notifiers/chat_controller.dart';
 import '../../../message/presentation/notifiers/message_controller.dart';
 import '../../../message/domain/entities/message_entity.dart';
 import '../../../../di/providers.dart';
+import '../../../call/presentation/screens/outgoing_call_screen.dart';
+import '../../../call/presentation/notifiers/call_controller.dart';
 
 class _MessageListItem {
   final bool isDateSeparator;
@@ -581,6 +583,34 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
           ),
 
+          // Call button
+          IconButton(
+            icon: Icon(
+              Icons.call,
+              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+            ),
+            onPressed: () {
+               // Initiate call
+               final receiverId = widget.chatId; // Assuming chat ID is user ID for direct chats
+               // Verify logic: IF group chat, disable or handle differently. Assuming 1-on-1 for now.
+
+               if (widget.chatId.isNotEmpty) {
+                 final controller = ref.read(callControllerProvider.notifier);
+                 controller.initiateCall(widget.chatId);
+
+                 Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => OutgoingCallScreen(
+                        receiverId: widget.chatId,
+                        receiverName: chatName,
+                      ),
+                    ),
+                 );
+               }
+            },
+          ),
+
           // Edit button (menu with delete option)
           PopupMenuButton<String>(
             icon: Icon(
@@ -606,16 +636,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
             ],
           ),
-          const SizedBox(width: 4),
-          // Call button (replaced video call)
-          IconButton(
-            onPressed: () {}, // TODO: Start voice call
-            icon: Icon(
-              Icons.call,
-              color: AppColors.primary,
-              size: 26,
-            ),
-          ),
+
         ],
       ),
     );
