@@ -590,22 +590,58 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
             ),
             onPressed: () {
-               // Initiate call
-               final receiverId = widget.chatId; // Assuming chat ID is user ID for direct chats
-               // Verify logic: IF group chat, disable or handle differently. Assuming 1-on-1 for now.
+               // Extract the other user's ID from chatId
+               // chatId format is "userId1_userId2" (sorted alphabetically)
+               if (widget.chatId.isNotEmpty && _currentUserId != null) {
+                 final chatIdParts = widget.chatId.split('_');
+                 String? receiverId;
+                 
+                 // Find the participant ID that is NOT the current user
+                 for (final part in chatIdParts) {
+                   if (part != _currentUserId && part.length == 24) {
+                     // Valid MongoDB ObjectId format
+                     receiverId = part;
+                     break;
+                   }
+                 }
+                 
+                 if (receiverId == null) {
+                   // Fallback: try to get from chat entity if available
+                   final chatState = ref.read(chatControllerProvider);
+                   final chat = chatState.chats.firstWhere(
+                     (c) => c.id == widget.chatId,
+                     orElse: () => chatState.chats.first,
+                   );
+                   
+                   if (chat.participantIds.isNotEmpty) {
+                     receiverId = chat.participantIds.firstWhere(
+                       (id) => id != _currentUserId,
+                       orElse: () => chat.participantIds.first,
+                     );
+                   }
+                 }
+                 
+                 if (receiverId != null && receiverId.isNotEmpty) {
+                   final controller = ref.read(callControllerProvider.notifier);
+                   controller.initiateCall(receiverId);
 
-               if (widget.chatId.isNotEmpty) {
-                 final controller = ref.read(callControllerProvider.notifier);
-                 controller.initiateCall(widget.chatId);
-
-                 Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => OutgoingCallScreen(
-                        receiverId: widget.chatId,
-                        receiverName: chatName,
+                   Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => OutgoingCallScreen(
+                          receiverId: receiverId!,
+                          receiverName: chatName,
+                        ),
                       ),
-                    ),
+                   );
+                 } else {
+                   ScaffoldMessenger.of(context).showSnackBar(
+                     const SnackBar(content: Text('Unable to determine recipient for call')),
+                   );
+                 }
+               } else if (_currentUserId == null) {
+                 ScaffoldMessenger.of(context).showSnackBar(
+                   const SnackBar(content: Text('Please wait, loading user information...')),
                  );
                }
             },
@@ -662,18 +698,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     final currentMessageCount = messages.length;
 
-    // Check if new message was added (from other user)
+    // Check if new message was added (from other user or our own)
     if (currentMessageCount > _previousMessageCount && messages.isNotEmpty) {
       final lastMessage = messages.last;
       final isFromCurrentUser = lastMessage.senderId == currentUserId;
 
-      // Only auto-scroll if message is from other user and user is at bottom
-      // (Current user messages already scroll in _handleSendMessage)
-      if (!isFromCurrentUser) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Auto-scroll for new messages
+      // If from current user, always scroll (handled in _handleSendMessage too, but ensure it here)
+      // If from other user, only scroll if user is near bottom
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (isFromCurrentUser) {
+          // Always scroll for our own messages
+          _scrollToBottom(force: true);
+        } else {
+          // Scroll for other user's messages if we're near bottom
           _scrollToBottom(force: false);
-        });
-      }
+        }
+      });
 
       _previousMessageCount = currentMessageCount;
     } else if (currentMessageCount != _previousMessageCount) {

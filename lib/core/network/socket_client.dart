@@ -13,6 +13,7 @@ class SocketClient {
   IO.Socket? _socket;
   final SecureStorage _secureStorage = SecureStorage.instance;
   bool _isConnected = false;
+  final Map<String, List<Function(dynamic)>> _pendingListeners = {}; // Store listeners to register when socket connects
 
   bool get isConnected => _isConnected;
 
@@ -54,6 +55,19 @@ class SocketClient {
     _socket!.onConnect((_) {
       _isConnected = true;
       Logger.d('Socket.IO connected');
+      
+      // Register all pending listeners now that socket is connected
+      final pendingCount = _pendingListeners.values.fold<int>(0, (sum, list) => sum + list.length);
+      _pendingListeners.forEach((event, callbacks) {
+        for (final callback in callbacks) {
+          _socket!.on(event, (data) {
+            Logger.d('Socket.IO received: $event');
+            callback(data);
+          });
+        }
+      });
+      _pendingListeners.clear();
+      Logger.d('Socket.IO: Registered $pendingCount pending listeners');
     });
 
     _socket!.onDisconnect((_) {
@@ -95,15 +109,27 @@ class SocketClient {
 
   /// Listen to an event from the server
   void on(String event, Function(dynamic) callback) {
-    if (_socket == null) {
-      Logger.w('Socket not initialized, cannot listen to event: $event');
+    if (_socket == null || !_isConnected) {
+      // Store listener to register when socket connects
+      if (!_pendingListeners.containsKey(event)) {
+        _pendingListeners[event] = [];
+      }
+      _pendingListeners[event]!.add(callback);
+      Logger.d('Socket.IO: Stored listener for $event (will register when connected). Total pending: ${_pendingListeners.length}');
+      
+      // Try to connect if not already connecting
+      if (_socket == null) {
+        connect();
+      }
       return;
     }
 
+    // Socket is connected, register immediately
     _socket!.on(event, (data) {
       Logger.d('Socket.IO received: $event');
       callback(data);
     });
+    Logger.d('Socket.IO: Registered listener for $event');
   }
 
   /// Remove event listener

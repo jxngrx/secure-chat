@@ -12,13 +12,20 @@ class CallGlobalListener extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     ref.listen<CallState>(callControllerProvider, (previous, next) {
       if (next.status == CallStatus.ringing) {
-        // Check if we are the receiver (not caller)
+        // CRITICAL: Only show incoming call screen if we're NOT the caller
+        // Check both the isCaller flag and previous state to be safe
         final controller = ref.read(callControllerProvider.notifier);
-        if (!controller.isCaller) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const IncomingCallScreen()),
-            );
+        final wasInitiating = previous?.status == CallStatus.initiating;
+        final isCaller = controller.isCaller;
+        
+        // Don't show incoming call screen if:
+        // 1. We're marked as the caller
+        // 2. Previous status was initiating (we were calling)
+        if (!isCaller && !wasInitiating) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const IncomingCallScreen()),
+          );
         }
       } else if (next.status == CallStatus.connected) {
          // Handle connection if needed

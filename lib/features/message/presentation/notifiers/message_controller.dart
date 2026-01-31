@@ -40,15 +40,38 @@ class MessageController extends StateNotifier<MessageState> {
     this._repository,
     this._socketDataSource,
   ) : super(MessageState()) {
+    // Setup listeners immediately, but also ensure socket is connected
+    _ensureSocketConnected();
     _setupSocketListeners();
   }
 
   final MessageRepository _repository;
   final ChatSocketDataSource _socketDataSource;
+  bool _listenersSetup = false;
+
+  Future<void> _ensureSocketConnected() async {
+    try {
+      await _socketDataSource.connect();
+      Logger.d('MessageController: Socket connection ensured');
+    } catch (e) {
+      Logger.e('MessageController: Error ensuring socket connection', e);
+    }
+  }
 
   void _setupSocketListeners() {
+    if (_listenersSetup) {
+      Logger.d('MessageController: Socket listeners already setup');
+      return;
+    }
+
+    Logger.d('MessageController: Setting up socket listeners');
+
     // Listen for new messages (from other users or our own messages via broadcast)
     _socketDataSource.onNewMessage((data) {
+      final chatId = data['chatId'] as String? ?? 'unknown';
+      final messageId = data['id'] as String? ?? 'unknown';
+      final content = data['content'] as String? ?? '';
+      Logger.d('MessageController: Received message:new event - chatId: $chatId, id: $messageId, content: ${content.length > 50 ? content.substring(0, 50) + "..." : content}');
       try {
         final message = MessageEntity(
           id: data['id'] as String? ?? '',
@@ -67,16 +90,22 @@ class MessageController extends StateNotifier<MessageState> {
           status: 'delivered',
         );
 
+        Logger.d('MessageController: Processing message - id: ${message.id}, chatId: ${message.chatId}, senderId: ${message.senderId}');
+
         final currentMessages = Map<String, List<MessageEntity>>.from(state.messages);
         final chatMessages = List<MessageEntity>.from(currentMessages[message.chatId] ?? []);
+
+        Logger.d('MessageController: Current messages for chat ${message.chatId}: ${chatMessages.length}');
 
         // Check if message already exists by ID
         final existingByIdIndex = chatMessages.indexWhere((m) => m.id == message.id);
         if (existingByIdIndex != -1) {
           // Message already exists, just update it
+          Logger.d('MessageController: Message already exists, updating');
           chatMessages[existingByIdIndex] = message;
           currentMessages[message.chatId] = chatMessages;
           state = state.copyWith(messages: currentMessages);
+          Logger.d('MessageController: State updated (existing message)');
           return;
         }
 
@@ -97,15 +126,20 @@ class MessageController extends StateNotifier<MessageState> {
 
         if (optimisticIndex != null) {
           // Replace optimistic message with real message from server
+          Logger.d('MessageController: Replacing optimistic message at index $optimisticIndex');
           chatMessages[optimisticIndex] = message;
         } else {
           // New message from other user, add it
+          Logger.d('MessageController: Adding new message from other user');
           chatMessages.add(message);
           chatMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
         }
 
         currentMessages[message.chatId] = chatMessages;
+        
+        Logger.d('MessageController: Updating state with ${chatMessages.length} messages for chat ${message.chatId}');
         state = state.copyWith(messages: currentMessages);
+        Logger.d('MessageController: State updated successfully - chat ${message.chatId} now has ${chatMessages.length} messages');
       } catch (e) {
         Logger.e('Error handling new message from socket', e);
       }
@@ -244,13 +278,16 @@ class MessageController extends StateNotifier<MessageState> {
             // The UI will filter it out if needed.
           }
 
-          currentMessages[chatId] = chatMessages;
-          state = state.copyWith(messages: currentMessages);
-        }
-      } catch (e) {
-        Logger.e('Error handling message deleted event', e);
+        currentMessages[chatId] = chatMessages;
+        state = state.copyWith(messages: currentMessages);
       }
-    });
+    } catch (e) {
+      Logger.e('Error handling message deleted event', e);
+    }
+  });
+
+    _listenersSetup = true;
+    Logger.d('MessageController: Socket listeners setup complete');
   }
 
   Future<MessageEntity?> sendMessage({
