@@ -1,5 +1,3 @@
-import 'dart:convert';
-import 'package:crypto/crypto.dart';
 import '../../../../core/network/api_client.dart';
 
 class ContactRemoteDataSource {
@@ -9,24 +7,24 @@ class ContactRemoteDataSource {
 
   final ApiClient _apiClient = ApiClient.instance;
 
-  /// Hash phone number using SHA-256
-  String _hashPhoneNumber(String phone) {
-    final cleaned = phone.replaceAll(RegExp(r'[^\d+]'), '');
-    final bytes = utf8.encode(cleaned);
-    final digest = sha256.convert(bytes);
-    return digest.toString();
-  }
-
-  /// Sync contacts with backend (phone numbers are hashed)
-  Future<List<Map<String, dynamic>>> syncContacts(List<String> phoneNumbers) async {
-    final phoneHashes = phoneNumbers.map(_hashPhoneNumber).toList();
-
+  /// Sync contacts with backend using new format
+  /// 
+  /// [contacts] - List of maps with phoneNumber and contactName:
+  /// [
+  ///   {
+  ///     "phoneNumber": "+1234567890",
+  ///     "contactName": "John Doe"
+  ///   }
+  /// ]
+  Future<List<Map<String, dynamic>>> syncContacts(
+    List<Map<String, String>> contacts,
+  ) async {
     final response = await _apiClient.post('/contacts/sync', {
-      'phoneHashes': phoneHashes,
+      'contacts': contacts,
     });
 
-    final contacts = response['data']?['contacts'] as List<dynamic>? ?? [];
-    return contacts.cast<Map<String, dynamic>>();
+    final syncedContacts = response['data']?['contacts'] as List<dynamic>? ?? [];
+    return syncedContacts.cast<Map<String, dynamic>>();
   }
 
   /// Get contacts

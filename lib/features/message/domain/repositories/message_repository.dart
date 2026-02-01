@@ -1,4 +1,5 @@
 import '../entities/message_entity.dart';
+import '../../../../core/models/paginated_result.dart';
 
 abstract class MessageRepository {
   Future<MessageEntity> sendMessage({
@@ -7,7 +8,7 @@ abstract class MessageRepository {
     required String content,
   });
 
-  Future<List<MessageEntity>> getChatMessages({
+  Future<PaginatedResult<MessageEntity>> getChatMessages({
     required String chatId,
     int limit = 50,
     String? before,

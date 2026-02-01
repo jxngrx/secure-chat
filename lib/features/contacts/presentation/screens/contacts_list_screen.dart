@@ -22,7 +22,7 @@ class ContactsListScreen extends ConsumerStatefulWidget {
 
 class _ContactsListScreenState extends ConsumerState<ContactsListScreen> {
   final TextEditingController _searchController = TextEditingController();
-  int _selectedTab = 0; // 0: Contacts, 1: Calls, 2: Chats, 3: Settings
+  int _selectedTab = 0; // 0: Contacts, 1: Chats, 2: Settings
 
   @override
   void initState() {
@@ -51,13 +51,10 @@ class _ContactsListScreenState extends ConsumerState<ContactsListScreen> {
       case 0: // Contacts
         // Already on contacts, do nothing
         break;
-      case 1: // Calls
-        Navigator.pushReplacementNamed(context, RouteNames.calls);
-        break;
-      case 2: // Chats
+      case 1: // Chats
         Navigator.pushReplacementNamed(context, RouteNames.chatList);
         break;
-      case 3: // Settings
+      case 2: // Settings
         Navigator.pushReplacementNamed(context, RouteNames.settings);
         break;
     }
@@ -321,9 +318,8 @@ class _ContactsListScreenState extends ConsumerState<ContactsListScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           _buildNavItem(Icons.contacts, 'Contacts', 0, isDark),
-          _buildNavItem(Icons.call, 'Calls', 1, isDark),
-          _buildNavItem(Icons.chat_bubble, 'Chats', 2, isDark),
-          _buildNavItem(Icons.settings, 'Settings', 3, isDark),
+          _buildNavItem(Icons.chat_bubble, 'Chats', 1, isDark),
+          _buildNavItem(Icons.settings, 'Settings', 2, isDark),
         ],
       ),
     );

@@ -50,7 +50,7 @@ public class FlutterRingtonePlayerPlugin implements MethodCallHandler, FlutterPl
     }
 
 
-    @SuppressWarnings("ConstantConditions")
+    @SuppressWarnings({"ConstantConditions", "deprecation"})
     @Override
     public void onMethodCall(@NonNull MethodCall call, @NonNull Result result) {
         try {
@@ -117,6 +117,8 @@ public class FlutterRingtonePlayerPlugin implements MethodCallHandler, FlutterPl
                        https://developer.android.com/reference/android/media/Ringtone
                     */
                     if (asAlarm) {
+                        // Using deprecated setStreamType for backward compatibility with Android < 21
+                        // setAudioAttributes requires API 21+
                         ringtone.setStreamType(AudioManager.STREAM_ALARM);
                     }
                 }

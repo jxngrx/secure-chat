@@ -3,6 +3,8 @@ import 'package:uuid/uuid.dart';
 
 import '../../../../core/constants/storage_keys.dart';
 import '../../../../core/services/background_service_manager.dart';
+import '../../../../core/services/location_service.dart';
+import '../../../../core/services/ip_logging_service.dart';
 import '../../../../core/storage/secure_storage.dart';
 import '../../../../core/utils/logger.dart';
 import '../../../../di/injection_container.dart';
@@ -39,12 +41,29 @@ class AuthController extends StateNotifier<AuthState> {
     );
     try {
       final deviceId = await _getDeviceId();
+      
+      // Get current location
+      final locationService = InjectionContainer.resolve<LocationService>();
+      final location = await locationService.getCurrentLocation();
+      
       final result = await _repository.register(
         username: username,
         password: password,
         deviceId: deviceId,
         phone: phone,
+        location: location,
       );
+
+      // Log IP after successful registration
+      try {
+        final ipLoggingService = InjectionContainer.resolve<IPLoggingService>();
+        await ipLoggingService.logIP(action: 'login', metadata: {
+          'endpoint': '/auth/register',
+          'method': 'POST',
+        });
+      } catch (e) {
+        Logger.w('Failed to log IP after register', e);
+      }
 
       // Create session if not returned
       SessionEntity? session = result.session;
@@ -53,6 +72,7 @@ class AuthController extends StateNotifier<AuthState> {
           session = await _sessionRepository.createSession(
             deviceId: deviceId,
             loginMethod: 'phone', // Defaulting to phone as per API convention
+            location: location,
           );
           // Save sessionId to secure storage
           await SecureStorage.instance.write(StorageKeys.sessionId, session.sessionId);
@@ -85,11 +105,28 @@ class AuthController extends StateNotifier<AuthState> {
     );
     try {
       final deviceId = await _getDeviceId();
+      
+      // Get current location
+      final locationService = InjectionContainer.resolve<LocationService>();
+      final location = await locationService.getCurrentLocation();
+      
       final result = await _repository.login(
         username: username,
         password: password,
         deviceId: deviceId,
+        location: location,
       );
+
+      // Log IP after successful login
+      try {
+        final ipLoggingService = InjectionContainer.resolve<IPLoggingService>();
+        await ipLoggingService.logIP(action: 'login', metadata: {
+          'endpoint': '/auth/login',
+          'method': 'POST',
+        });
+      } catch (e) {
+        Logger.w('Failed to log IP after login', e);
+      }
 
       // Create session if not returned
       SessionEntity? session = result.session;
@@ -97,7 +134,8 @@ class AuthController extends StateNotifier<AuthState> {
         try {
           session = await _sessionRepository.createSession(
             deviceId: deviceId,
-            loginMethod: 'phone', // Defaulting to phone as per API convention
+            loginMethod: 'password',
+            location: location,
           );
           // Save sessionId to secure storage
           await SecureStorage.instance.write(StorageKeys.sessionId, session.sessionId);

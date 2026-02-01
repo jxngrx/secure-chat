@@ -1,5 +1,6 @@
 import '../network/api_client.dart';
 import '../services/device_info_service.dart';
+import '../services/fcm_service.dart';
 import '../utils/logger.dart';
 import '../../features/device/domain/entities/device_entity.dart';
 
@@ -27,6 +28,12 @@ class DeviceRegistrationService {
 
       if (deviceDetails.imei != null && deviceDetails.imei!.isNotEmpty) {
         payload['imei'] = deviceDetails.imei;
+      }
+
+      // Add FCM token if available
+      final fcmToken = FCMService.instance.currentToken;
+      if (fcmToken != null && fcmToken.isNotEmpty) {
+        payload['fcmToken'] = fcmToken;
       }
 
       await _apiClient.post('/devices/register', payload);

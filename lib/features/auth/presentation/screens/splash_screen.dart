@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/constants/app_assets.dart';
 import '../../../../core/constants/storage_keys.dart';
 import '../../../../core/routing/route_names.dart';
 import '../../../../core/storage/secure_storage.dart';
@@ -117,19 +118,12 @@ class _SplashScreenState extends State<SplashScreen>
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Spacer(),
-              // App Icon - Rounded square with blue fill and white padlock
-              Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2196F3), // Vibrant blue
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: const Icon(
-                  Icons.lock_open,
-                  size: 64,
-                  color: Colors.white,
-                ),
+              // App Logo
+              Image.asset(
+                AppAssets.logo,
+                width: 200,
+                height: 200,
+                fit: BoxFit.contain,
               ),
               const SizedBox(height: 32),
               // App Name

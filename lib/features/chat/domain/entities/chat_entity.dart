@@ -18,4 +18,25 @@ class ChatEntity {
     this.lastMessage,
     this.unreadCount,
   });
+  ChatEntity copyWith({
+    String? id,
+    String? name,
+    List<String>? participantIds,
+    String? lastMessageId,
+    DateTime? lastMessageTime,
+    bool? isGroup,
+    Map<String, dynamic>? lastMessage,
+    int? unreadCount,
+  }) {
+    return ChatEntity(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      participantIds: participantIds ?? this.participantIds,
+      lastMessageId: lastMessageId ?? this.lastMessageId,
+      lastMessageTime: lastMessageTime ?? this.lastMessageTime,
+      isGroup: isGroup ?? this.isGroup,
+      lastMessage: lastMessage ?? this.lastMessage,
+      unreadCount: unreadCount ?? this.unreadCount,
+    );
+  }
 }

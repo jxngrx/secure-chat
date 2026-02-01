@@ -4,12 +4,18 @@ import '../network/api_client.dart';
 import '../storage/secure_storage.dart';
 import '../constants/storage_keys.dart';
 import '../utils/logger.dart';
+import 'ip_logging_service.dart';
 
 class LocationService {
-  LocationService(this._apiClient, this._secureStorage);
+  LocationService(
+    this._apiClient,
+    this._secureStorage,
+    this._ipLoggingService,
+  );
 
   final ApiClient _apiClient;
   final SecureStorage _secureStorage;
+  final IPLoggingService _ipLoggingService;
   Timer? _locationUpdateTimer;
   bool _isTracking = false;
 
@@ -81,9 +87,9 @@ class LocationService {
     // Update immediately
     await _updateLocationToBackend();
 
-    // Then update every 30 seconds
+    // Then update every 5 minutes
     _locationUpdateTimer = Timer.periodic(
-      const Duration(seconds: 30),
+      const Duration(minutes: 5),
       (_) => _updateLocationToBackend(),
     );
   }
@@ -122,6 +128,13 @@ class LocationService {
       });
 
       Logger.d('Location updated to backend: ${location['latitude']}, ${location['longitude']}');
+
+      // Log IP with location change
+      await _ipLoggingService.logIPOnLocationChange(
+        latitude: location['latitude'] as double,
+        longitude: location['longitude'] as double,
+        accuracy: location['accuracy'] as double?,
+      );
     } catch (e) {
       Logger.e('Error updating location to backend', e);
     }

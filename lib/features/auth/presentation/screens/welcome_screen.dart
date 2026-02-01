@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/constants/app_assets.dart';
 import '../../../../core/routing/route_names.dart';
 
 class WelcomeScreen extends StatefulWidget {
@@ -93,10 +94,11 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
-                            Icons.lock,
-                            color: AppColors.primary,
-                            size: 20,
+                          Image.asset(
+                            AppAssets.logo,
+                            width: 20,
+                            height: 20,
+                            fit: BoxFit.contain,
                           ),
                           const SizedBox(width: 8),
                           Text(

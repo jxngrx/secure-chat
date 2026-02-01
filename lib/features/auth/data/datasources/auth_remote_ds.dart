@@ -10,6 +10,7 @@ class AuthRemoteDataSource {
     required String password,
     required String deviceId,
     String? phone,
+    Map<String, dynamic>? location,
   }) async {
     final payload = <String, dynamic>{
       'password': password,
@@ -22,6 +23,9 @@ class AuthRemoteDataSource {
     if (phone != null) {
       payload['phone'] = phone;
     }
+    if (location != null) {
+      payload['location'] = location;
+    }
 
     final response = await _apiClient.post('/auth/register', payload);
     return response['data'] as Map<String, dynamic>? ?? <String, dynamic>{};
@@ -31,12 +35,17 @@ class AuthRemoteDataSource {
     required String username,
     required String password,
     required String deviceId,
+    Map<String, dynamic>? location,
   }) async {
     final payload = <String, dynamic>{
       'username': username,
       'password': password,
       'deviceId': deviceId,
     };
+
+    if (location != null) {
+      payload['location'] = location;
+    }
 
     final response = await _apiClient.post('/auth/login', payload);
     return response['data'] as Map<String, dynamic>? ?? <String, dynamic>{};

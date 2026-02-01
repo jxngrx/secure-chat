@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
-import '../../../call/presentation/screens/calls_screen.dart';
 import '../../../chat/presentation/screens/chat_list_screen.dart';
 import '../../../contacts/presentation/screens/contacts_list_screen.dart';
 import '../../../settings/presentation/screens/settings_screen.dart';
@@ -8,7 +7,7 @@ import '../../../settings/presentation/screens/settings_screen.dart';
 class HomeShell extends StatefulWidget {
   const HomeShell({
     super.key,
-    this.initialTab = 2,
+    this.initialTab = 1,
   });
 
   final int initialTab;
@@ -25,7 +24,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
-    _currentIndex = widget.initialTab.clamp(0, 3);
+    _currentIndex = widget.initialTab.clamp(0, 2);
     _pageController = PageController(initialPage: _currentIndex);
     _tabs = [
       _HomeTabConfig(
@@ -33,15 +32,6 @@ class _HomeShellState extends State<HomeShell> {
         icon: Icons.contacts,
         child: ContactsListScreen(
           key: const PageStorageKey('contacts_tab'),
-          showBottomNav: false,
-          onTabSelected: _handleExternalTabRequest,
-        ),
-      ),
-      _HomeTabConfig(
-        label: 'Calls',
-        icon: Icons.call,
-        child: CallsScreen(
-          key: const PageStorageKey('calls_tab'),
           showBottomNav: false,
           onTabSelected: _handleExternalTabRequest,
         ),

@@ -7,12 +7,14 @@ abstract class AuthRepository {
     required String password,
     required String deviceId,
     String? phone,
+    Map<String, dynamic>? location,
   });
 
   Future<AuthResultEntity> login({
     required String username,
     required String password,
     required String deviceId,
+    Map<String, dynamic>? location,
   });
 
   Future<UserEntity> updateUsername(String username);

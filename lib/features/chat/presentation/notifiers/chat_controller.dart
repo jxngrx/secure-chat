@@ -12,6 +12,9 @@ class ChatState {
   final String? error;
   final Map<String, List<MessageEntity>> messages; // chatId -> messages
   final Map<String, bool> loadingMessages; // chatId -> loading state
+  final bool hasMore;
+  final String? nextCursor;
+  final bool isLoadingMore;
 
   ChatState({
     this.chats = const [],
@@ -19,6 +22,9 @@ class ChatState {
     this.error,
     Map<String, List<MessageEntity>>? messages,
     Map<String, bool>? loadingMessages,
+    this.hasMore = false,
+    this.nextCursor,
+    this.isLoadingMore = false,
   })  : messages = messages ?? {},
         loadingMessages = loadingMessages ?? {};
 
@@ -29,6 +35,9 @@ class ChatState {
     bool clearError = false,
     Map<String, List<MessageEntity>>? messages,
     Map<String, bool>? loadingMessages,
+    bool? hasMore,
+    String? nextCursor,
+    bool? isLoadingMore,
   }) {
     return ChatState(
       chats: chats ?? this.chats,
@@ -36,6 +45,9 @@ class ChatState {
       error: clearError ? null : (error ?? this.error),
       messages: messages ?? this.messages,
       loadingMessages: loadingMessages ?? this.loadingMessages,
+      hasMore: hasMore ?? this.hasMore,
+      nextCursor: nextCursor ?? this.nextCursor,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
     );
   }
 
@@ -100,7 +112,49 @@ class ChatController extends StateNotifier<ChatState> {
           status: data['status'] as String? ?? 'sent',
         );
 
+        // Update messages map (for snippet/internal use)
+        // Note: ChatScreen largely uses MessageController, but this helps cache
         state = state.addMessage(message.chatId, message);
+
+        // Update CHATS list (Home Screen)
+        final currentChats = List<ChatEntity>.from(state.chats);
+        final chatIndex = currentChats.indexWhere((c) => c.id == message.chatId);
+
+        if (chatIndex != -1) {
+          final chat = currentChats[chatIndex];
+          // Remove from current position
+          currentChats.removeAt(chatIndex);
+
+          // Determine unread count logic (custom logic needed depending on if user is sender)
+          // Ideally we check currentUserId, but for now we rely on backend 'unreadCount' or increment
+          // if not us.
+          // Since we don't have easy access to currentUserId here without async storage call...
+          // We'll increment if it's incoming (basic heuristic) or rely on socket 'chat:updated'.
+
+          final updatedChat = chat.copyWith(
+            lastMessage: {
+              'content': message.content,
+              'type': message.type,
+              'createdAt': message.timestamp.toIso8601String(),
+              'sender': {
+                 'id': message.senderId,
+                 'username': message.senderName,
+              },
+            },
+            lastMessageTime: message.timestamp,
+            // If we are sender, unread count typically doesn't increase for us.
+            // If receiver, it does.
+            // Simplified: Just update content/time, let 'chat:updated' handle accurate counts if possible.
+          );
+
+          // Add to top
+          currentChats.insert(0, updatedChat);
+
+          state = state.copyWith(chats: currentChats);
+        } else {
+             // New chat? Fetch it or wait for 'chat:updated'
+             loadChats();
+        }
 
         // Auto-mark as delivered
         _socketDataSource.markAsDelivered(message.chatId);
@@ -154,12 +208,44 @@ class ChatController extends StateNotifier<ChatState> {
   Future<void> loadChats() async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      final chats = await _repository.getChats();
-      state = state.copyWith(chats: chats, isLoading: false);
+      final result = await _repository.getChats();
+      state = state.copyWith(
+        chats: result.items,
+        isLoading: false,
+        hasMore: result.hasMore,
+        nextCursor: result.nextCursor,
+      );
     } catch (e) {
       Logger.e('Error loading chats', e);
       state = state.copyWith(
         isLoading: false,
+        error: e.toString(),
+      );
+    }
+  }
+
+  Future<void> loadMoreChats() async {
+    if (state.isLoadingMore || !state.hasMore || state.nextCursor == null) return;
+
+    state = state.copyWith(isLoadingMore: true);
+    try {
+      final result = await _repository.getChats(
+        before: state.nextCursor,
+      );
+
+      final currentChats = List<ChatEntity>.from(state.chats);
+      currentChats.addAll(result.items);
+
+      state = state.copyWith(
+        chats: currentChats,
+        isLoadingMore: false,
+        hasMore: result.hasMore,
+        nextCursor: result.nextCursor,
+      );
+    } catch (e) {
+      Logger.e('Error loading more chats', e);
+      state = state.copyWith(
+        isLoadingMore: false,
         error: e.toString(),
       );
     }

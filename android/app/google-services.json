@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "999019651859",
+    "project_id": "night-spirits",
+    "storage_bucket": "night-spirits.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:999019651859:android:3373fbdef7bc442d0e70e6",
+        "android_client_info": {
+          "package_name": "com.jxngrx.nightspirits"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAkafFFL7I6tXv8CVUsfjRxVWXXP1zIQuY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

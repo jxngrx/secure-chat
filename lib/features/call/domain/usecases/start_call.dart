@@ -5,7 +5,7 @@ class StartCallUseCase {
 
   final CallRepository _repository;
 
-  Future<void> call(String recipientId) async {
-    await _repository.startCall(recipientId);
+  Future<Map<String, dynamic>> call(String receiverId) async {
+    return await _repository.initiateCall(receiverId);
   }
 }

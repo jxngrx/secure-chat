@@ -12,24 +12,39 @@ import '../providers/message_providers.dart';
 class MessageState {
   final Map<String, List<MessageEntity>> messages; // chatId -> messages
   final Map<String, bool> sending; // chatId -> sending state
+  final Map<String, bool> hasMore; // chatId -> hasMore
+  final Map<String, String?> nextCursor; // chatId -> nextCursor
+  final Map<String, bool> isLoadingMore; // chatId -> loading more
   final String? error;
 
   MessageState({
     Map<String, List<MessageEntity>>? messages,
     Map<String, bool>? sending,
+    Map<String, bool>? hasMore,
+    Map<String, String?>? nextCursor,
+    Map<String, bool>? isLoadingMore,
     this.error,
   })  : messages = messages ?? {},
-        sending = sending ?? {};
+        sending = sending ?? {},
+        hasMore = hasMore ?? {},
+        nextCursor = nextCursor ?? {},
+        isLoadingMore = isLoadingMore ?? {};
 
   MessageState copyWith({
     Map<String, List<MessageEntity>>? messages,
     Map<String, bool>? sending,
+    Map<String, bool>? hasMore,
+    Map<String, String?>? nextCursor,
+    Map<String, bool>? isLoadingMore,
     String? error,
     bool clearError = false,
   }) {
     return MessageState(
       messages: messages ?? this.messages,
       sending: sending ?? this.sending,
+      hasMore: hasMore ?? this.hasMore,
+      nextCursor: nextCursor ?? this.nextCursor,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       error: clearError ? null : (error ?? this.error),
     );
   }
@@ -136,7 +151,7 @@ class MessageController extends StateNotifier<MessageState> {
         }
 
         currentMessages[message.chatId] = chatMessages;
-        
+
         Logger.d('MessageController: Updating state with ${chatMessages.length} messages for chat ${message.chatId}');
         state = state.copyWith(messages: currentMessages);
         Logger.d('MessageController: State updated successfully - chat ${message.chatId} now has ${chatMessages.length} messages');
@@ -419,28 +434,89 @@ class MessageController extends StateNotifier<MessageState> {
     }
   }
 
-  Future<void> loadMessages(String chatId, {int limit = 50, String? before}) async {
+  Future<void> loadMessages(String chatId, {int limit = 50}) async {
     try {
-      final messages = await _repository.getChatMessages(
+      final result = await _repository.getChatMessages(
         chatId: chatId,
         limit: limit,
-        before: before,
       );
 
       final currentMessages = Map<String, List<MessageEntity>>.from(state.messages);
-      if (before == null) {
-        // Replace messages
-        currentMessages[chatId] = messages;
-      } else {
-        // Append messages
-        final existing = currentMessages[chatId] ?? [];
-        currentMessages[chatId] = [...existing, ...messages];
-      }
+      currentMessages[chatId] = result.items;
 
-      state = state.copyWith(messages: currentMessages);
+      final hasMoreMap = Map<String, bool>.from(state.hasMore);
+      hasMoreMap[chatId] = result.hasMore;
+
+      final nextCursorMap = Map<String, String?>.from(state.nextCursor);
+      nextCursorMap[chatId] = result.nextCursor;
+
+      state = state.copyWith(
+        messages: currentMessages,
+        hasMore: hasMoreMap,
+        nextCursor: nextCursorMap,
+      );
     } catch (e) {
       Logger.e('Error loading messages', e);
       state = state.copyWith(error: e.toString());
+    }
+  }
+
+  Future<void> loadMoreMessages(String chatId, {int limit = 50}) async {
+    if (state.isLoadingMore[chatId] == true || state.hasMore[chatId] == false) {
+      return;
+    }
+
+    try {
+      // Set loading more state
+      final loadingMoreMap = Map<String, bool>.from(state.isLoadingMore);
+      loadingMoreMap[chatId] = true;
+      state = state.copyWith(isLoadingMore: loadingMoreMap);
+
+      final cursor = state.nextCursor[chatId];
+      final result = await _repository.getChatMessages(
+        chatId: chatId,
+        limit: limit,
+        before: cursor,
+      );
+
+      final currentMessages = Map<String, List<MessageEntity>>.from(state.messages);
+      final existingMessages = currentMessages[chatId] ?? [];
+
+      // Prepend older messages
+      // API returns [Newest...Oldest] in the page.
+      // Existing list is [Oldest...Newest].
+      // So we want: [Oldest_Fetched...Newest_Fetched, Oldest_Existing...Newest_Existing]
+      // Result items need to be reversed to be [Oldest...Newest] before prepending?
+      // OR just add all and sort. Sorting is safest.
+
+      final allMessages = [...existingMessages, ...result.items];
+      allMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+      currentMessages[chatId] = allMessages;
+
+      final hasMoreMap = Map<String, bool>.from(state.hasMore);
+      hasMoreMap[chatId] = result.hasMore;
+
+      final nextCursorMap = Map<String, String?>.from(state.nextCursor);
+      nextCursorMap[chatId] = result.nextCursor;
+
+      final loadingMoreMapEnd = Map<String, bool>.from(state.isLoadingMore);
+      loadingMoreMapEnd[chatId] = false;
+
+      state = state.copyWith(
+        messages: currentMessages,
+        hasMore: hasMoreMap,
+        nextCursor: nextCursorMap,
+        isLoadingMore: loadingMoreMapEnd,
+      );
+    } catch (e) {
+      Logger.e('Error loading more messages', e);
+      final loadingMoreMapEnd = Map<String, bool>.from(state.isLoadingMore);
+      loadingMoreMapEnd[chatId] = false;
+      state = state.copyWith(
+        error: e.toString(),
+        isLoadingMore: loadingMoreMapEnd,
+      );
     }
   }
 

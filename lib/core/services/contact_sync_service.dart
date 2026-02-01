@@ -28,16 +28,16 @@ class ContactSyncService {
         return 0;
       }
 
-      // Get phone numbers from device contacts
-      final phoneNumbers = await _contactService.getPhoneNumbers();
+      // Get contacts with phone numbers and names
+      final contacts = await _contactService.getContactsWithNames();
 
-      if (phoneNumbers.isEmpty) {
-        Logger.d('No phone numbers found in contacts');
+      if (contacts.isEmpty) {
+        Logger.d('No contacts found');
         return 0;
       }
 
       // Sync contacts with backend
-      final syncedContacts = await _apiService.syncContacts(phoneNumbers);
+      final syncedContacts = await _apiService.syncContacts(contacts);
 
       Logger.d('Synced ${syncedContacts.length} contacts with backend');
       return syncedContacts.length;

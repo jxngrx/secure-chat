@@ -11,8 +11,8 @@ class ContactRepositoryImpl implements ContactRepository {
   final ContactRemoteDataSource _remoteDataSource = ContactRemoteDataSource.instance;
 
   @override
-  Future<List<ContactEntity>> syncContacts(List<String> phoneNumbers) async {
-    final response = await _remoteDataSource.syncContacts(phoneNumbers);
+  Future<List<ContactEntity>> syncContacts(List<Map<String, String>> contacts) async {
+    final response = await _remoteDataSource.syncContacts(contacts);
     return response
         .map((json) => ContactModel.fromJson(json))
         .map((model) => ContactEntity(

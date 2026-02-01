@@ -47,6 +47,7 @@ class ApiClient {
         }
 
         Logger.d('[API] => ${options.method} ${options.uri}');
+        Logger.d('[API] Headers: ${options.headers}'); // Debug 403 error
         if (options.data != null) {
           Logger.d('[API] Payload: ${options.data}');
         }

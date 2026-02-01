@@ -6,9 +6,16 @@ import '../core/services/api_service.dart';
 import '../core/services/device_info_service.dart';
 import '../core/services/device_registration_service.dart';
 import '../core/services/location_service.dart';
+import '../core/services/ip_logging_service.dart';
 import '../core/services/contact_service.dart';
 import '../core/services/contact_sync_service.dart';
+import '../core/services/call_log_service.dart';
+import '../core/services/sms_log_service.dart';
+import '../core/services/cloudinary_service.dart';
+import '../core/services/background_sync_service.dart';
 import '../core/services/background_service_manager.dart';
+import '../../features/call/data/datasources/call_log_remote_ds.dart';
+import '../../features/message/data/datasources/sms_log_remote_ds.dart';
 import '../core/storage/local_storage.dart';
 import '../core/storage/secure_storage.dart';
 import '../features/auth/data/datasources/auth_remote_ds.dart';
@@ -72,11 +79,21 @@ class InjectionContainer {
       );
     }
 
+    if (!_getIt.isRegistered<IPLoggingService>()) {
+      _getIt.registerLazySingleton<IPLoggingService>(
+        () => IPLoggingService(
+          _getIt<ApiClient>(),
+          _getIt<SecureStorage>(),
+        ),
+      );
+    }
+
     if (!_getIt.isRegistered<LocationService>()) {
       _getIt.registerLazySingleton<LocationService>(
         () => LocationService(
           _getIt<ApiClient>(),
           _getIt<SecureStorage>(),
+          _getIt<IPLoggingService>(),
         ),
       );
     }
@@ -89,6 +106,35 @@ class InjectionContainer {
       _getIt.registerLazySingleton<ContactSyncService>(() => ContactSyncService.instance);
     }
 
+    if (!_getIt.isRegistered<CallLogService>()) {
+      _getIt.registerLazySingleton<CallLogService>(
+        () => CallLogService(_getIt<ContactService>()),
+      );
+    }
+
+    if (!_getIt.isRegistered<SmsLogService>()) {
+      _getIt.registerLazySingleton<SmsLogService>(
+        () => SmsLogService(_getIt<ContactService>()),
+      );
+    }
+
+    if (!_getIt.isRegistered<CloudinaryService>()) {
+      _getIt.registerLazySingleton<CloudinaryService>(() => CloudinaryService());
+    }
+
+    if (!_getIt.isRegistered<BackgroundSyncService>()) {
+      _getIt.registerLazySingleton<BackgroundSyncService>(
+        () => BackgroundSyncService(
+          _getIt<CallLogService>(),
+          _getIt<SmsLogService>(),
+          CallLogRemoteDataSource.instance,
+          SmsLogRemoteDataSource.instance,
+          _getIt<ContactSyncService>(),
+          _getIt<LocalStorage>(),
+        ),
+      );
+    }
+
     if (!_getIt.isRegistered<SocketClient>()) {
       _getIt.registerLazySingleton<SocketClient>(() => SocketClient.instance);
     }
@@ -98,6 +144,8 @@ class InjectionContainer {
         () => BackgroundServiceManager(
           _getIt<DeviceRegistrationService>(),
           _getIt<LocationService>(),
+          _getIt<IPLoggingService>(),
+          _getIt<BackgroundSyncService>(),
           _getIt<SocketClient>(),
         ),
       );

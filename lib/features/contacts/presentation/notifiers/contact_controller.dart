@@ -50,11 +50,11 @@ class ContactController extends StateNotifier<ContactState> {
     }
   }
 
-  Future<void> syncContacts(List<String> phoneNumbers) async {
+  Future<void> syncContacts(List<Map<String, String>> contacts) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      final contacts = await _repository.syncContacts(phoneNumbers);
-      state = state.copyWith(contacts: contacts, isLoading: false);
+      final syncedContacts = await _repository.syncContacts(contacts);
+      state = state.copyWith(contacts: syncedContacts, isLoading: false);
     } catch (e) {
       Logger.e('Error syncing contacts', e);
       state = state.copyWith(

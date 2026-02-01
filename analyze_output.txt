@@ -1,0 +1,204 @@
+Analyzing frontend...                                           
+
+   info • The imported package 'flutter_ringtone_player' isn't a dependency of the importing package • flutter_ringtone_player_patch/example/lib/main.dart:2:8 • depend_on_referenced_packages
+   info • Constructors for public widgets should have a named 'key' parameter • flutter_ringtone_player_patch/example/lib/main.dart:6:7 • use_key_in_widget_constructors
+   info • The imported package 'flutter_ringtone_player' isn't a dependency of the importing package • flutter_ringtone_player_patch/flutter_ringtone_player-3.2.0/example/lib/main.dart:2:8 • depend_on_referenced_packages
+   info • Constructors for public widgets should have a named 'key' parameter • flutter_ringtone_player_patch/flutter_ringtone_player-3.2.0/example/lib/main.dart:6:7 • use_key_in_widget_constructors
+   info • Empty catch block • flutter_ringtone_player_patch/flutter_ringtone_player-3.2.0/lib/flutter_ringtone_player.dart:65:28 • empty_catches
+   info • Empty catch block • flutter_ringtone_player_patch/flutter_ringtone_player-3.2.0/lib/flutter_ringtone_player.dart:103:28 • empty_catches
+   info • Use an initializing formal to assign a parameter to a field • flutter_ringtone_player_patch/flutter_ringtone_player-3.2.0/lib/ios_sounds.dart:19:9 • prefer_initializing_formals
+warning • The '!' will have no effect because the receiver can't be null • flutter_ringtone_player_patch/flutter_ringtone_player-3.2.0/test/flutter_notifications_sound_test.dart:40:45 • unnecessary_non_null_assertion
+   info • Empty catch block • flutter_ringtone_player_patch/lib/flutter_ringtone_player.dart:65:28 • empty_catches
+   info • Empty catch block • flutter_ringtone_player_patch/lib/flutter_ringtone_player.dart:103:28 • empty_catches
+   info • Use an initializing formal to assign a parameter to a field • flutter_ringtone_player_patch/lib/ios_sounds.dart:19:9 • prefer_initializing_formals
+warning • The '!' will have no effect because the receiver can't be null • flutter_ringtone_player_patch/test/flutter_notifications_sound_test.dart:40:45 • unnecessary_non_null_assertion
+warning • Unused import: 'core/services/fcm_service.dart' • lib/app.dart:12:8 • unused_import
+   info • The prefix 'IO' isn't a lower_case_with_underscores identifier • lib/core/network/socket_client.dart:2:60 • library_prefixes
+warning • Unused import: '../../features/chat/data/models/chat_item_model.dart' • lib/core/routing/app_router.dart:13:8 • unused_import
+warning • Unused import: '../services/device_info_service.dart' • lib/core/services/api_service.dart:12:8 • unused_import
+warning • Dead code • lib/core/services/device_info_service.dart:57:33 • dead_code
+warning • The left operand can't be null, so the right operand is never executed • lib/core/services/device_info_service.dart:57:36 • dead_null_aware_expression
+warning • The left operand can't be null, so the right operand is never executed • lib/core/services/device_info_service.dart:58:44 • dead_null_aware_expression
+warning • The left operand can't be null, so the right operand is never executed • lib/core/services/device_info_service.dart:60:44 • dead_null_aware_expression
+warning • Dead code • lib/core/services/device_info_service.dart:71:43 • dead_code
+warning • The left operand can't be null, so the right operand is never executed • lib/core/services/device_info_service.dart:71:46 • dead_null_aware_expression
+warning • The left operand can't be null, so the right operand is never executed • lib/core/services/device_info_service.dart:74:42 • dead_null_aware_expression
+warning • Unused import: '../../features/device/domain/entities/device_entity.dart' • lib/core/services/device_registration_service.dart:5:8 • unused_import
+warning • Unused import: 'package:flutter/foundation.dart' • lib/core/services/fcm_service.dart:3:8 • unused_import
+warning • Unused import: '../network/api_client.dart' • lib/core/services/live_location_service.dart:3:8 • unused_import
+warning • Unused import: '../constants/storage_keys.dart' • lib/core/services/live_location_service.dart:5:8 • unused_import
+warning • The value of the field '_secureStorage' isn't used • lib/core/services/live_location_service.dart:13:23 • unused_field
+warning • Unused import: '../../features/media/data/datasources/media_remote_ds.dart' • lib/core/services/media_service.dart:2:8 • unused_import
+warning • Unused import: '../network/api_client.dart' • lib/core/services/session_service.dart:1:8 • unused_import
+warning • Unused import: '../../features/call/domain/entities/call_entity.dart' • lib/core/services/webrtc_service.dart:3:8 • unused_import
+   info • Don't invoke 'print' in production code • lib/core/services/webrtc_service.dart:78:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/core/services/webrtc_service.dart:97:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/core/services/webrtc_service.dart:116:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/core/services/webrtc_service.dart:144:7 • avoid_print
+   info • Unnecessary braces in a string interpolation • lib/core/utils/username_generator.dart:26:8 • unnecessary_brace_in_string_interps
+warning • Unused import: '../../../session/domain/entities/session_entity.dart' • lib/features/auth/data/repositories/auth_repo_impl.dart:8:8 • unused_import
+  error • The method 'sendOtp' isn't defined for the type 'AuthRepository' • lib/features/auth/domain/usecases/login_usecase.dart:9:23 • undefined_method
+  error • The method 'verifyOtp' isn't defined for the type 'AuthRepository' • lib/features/auth/domain/usecases/verify_otp_usecase.dart:10:30 • undefined_method
+warning • Unused import: '../../../../core/constants/app_strings.dart' • lib/features/auth/presentation/screens/login_screen.dart:5:8 • unused_import
+warning • Unused import: '../notifiers/auth_controller.dart' • lib/features/auth/presentation/screens/login_screen.dart:7:8 • unused_import
+warning • Unused import: '../notifiers/auth_controller.dart' • lib/features/auth/presentation/screens/register_screen.dart:8:8 • unused_import
+warning • The value of the local variable 'sessionId' isn't used • lib/features/auth/presentation/screens/splash_screen.dart:53:13 • unused_local_variable
+   info • The import of 'dart:typed_data' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/services.dart' • lib/features/auth/presentation/screens/username_setup_screen.dart:3:8 • unnecessary_import
+warning • Unused import: '../../../../di/injection_container.dart' • lib/features/auth/presentation/screens/username_setup_screen.dart:17:8 • unused_import
+warning • The value of the field '_selectedImage' isn't used • lib/features/auth/presentation/screens/username_setup_screen.dart:32:9 • unused_field
+warning • The value of the field '_selectedImageBytes' isn't used • lib/features/auth/presentation/screens/username_setup_screen.dart:33:14 • unused_field
+warning • The value of the field '_isCheckingUsername' isn't used • lib/features/auth/presentation/screens/username_setup_screen.dart:35:8 • unused_field
+warning • The value of the field '_isLoadingProfile' isn't used • lib/features/auth/presentation/screens/username_setup_screen.dart:37:8 • unused_field
+warning • The declaration '_pickImage' isn't referenced • lib/features/auth/presentation/screens/username_setup_screen.dart:174:16 • unused_element
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/auth/presentation/screens/username_setup_screen.dart:246:31 • deprecated_member_use
+warning • The value of the local variable 'backgroundColor' isn't used • lib/features/auth/presentation/screens/username_setup_screen.dart:427:11 • unused_local_variable
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/auth/presentation/screens/username_setup_screen.dart:441:37 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/auth/presentation/screens/username_setup_screen.dart:517:52 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/auth/presentation/screens/username_setup_screen.dart:524:47 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/auth/presentation/screens/username_setup_screen.dart:650:41 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/auth/presentation/screens/username_setup_screen.dart:702:42 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/auth/presentation/screens/username_setup_screen.dart:715:40 • deprecated_member_use
+   info • Unnecessary override • lib/features/auth/presentation/screens/welcome_screen.dart:22:8 • unnecessary_overrides
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/auth/presentation/screens/welcome_screen.dart:54:44 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/auth/presentation/screens/welcome_screen.dart:61:50 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/auth/presentation/screens/welcome_screen.dart:85:53 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/auth/presentation/screens/welcome_screen.dart:86:54 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/auth/presentation/screens/welcome_screen.dart:90:46 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/auth/presentation/screens/welcome_screen.dart:91:46 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/auth/presentation/screens/welcome_screen.dart:131:58 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/auth/presentation/screens/welcome_screen.dart:149:59 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/auth/presentation/screens/welcome_screen.dart:150:59 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/auth/presentation/screens/welcome_screen.dart:159:59 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/auth/presentation/screens/welcome_screen.dart:177:59 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/auth/presentation/screens/welcome_screen.dart:197:61 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/auth/presentation/screens/welcome_screen.dart:200:63 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/auth/presentation/screens/welcome_screen.dart:217:67 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/auth/presentation/screens/welcome_screen.dart:264:60 • deprecated_member_use
+  error • The named parameter 'startTime' is required, but there's no corresponding argument • lib/features/call/data/models/call_model.dart:52:12 • missing_required_argument
+  error • The named parameter 'startedAt' isn't defined • lib/features/call/data/models/call_model.dart:57:7 • undefined_named_parameter
+  error • The named parameter 'endedAt' isn't defined • lib/features/call/data/models/call_model.dart:58:7 • undefined_named_parameter
+  error • The named parameter 'duration' isn't defined • lib/features/call/data/models/call_model.dart:59:7 • undefined_named_parameter
+  error • The named parameter 'createdAt' isn't defined • lib/features/call/data/models/call_model.dart:60:7 • undefined_named_parameter
+  error • The method 'startCall' isn't defined for the type 'CallRepository' • lib/features/call/domain/usecases/start_call.dart:9:23 • undefined_method
+  error • Target of URI doesn't exist: '../../data/repositories/call_repo_impl.dart' • lib/features/call/presentation/providers/call_providers.dart:2:8 • uri_does_not_exist
+  error • Undefined name 'CallRepositoryImpl' • lib/features/call/presentation/providers/call_providers.dart:7:10 • undefined_identifier
+warning • Unused import: '../../../../core/services/webrtc_service.dart' • lib/features/call/presentation/screens/active_call_screen.dart:4:8 • unused_import
+warning • Unused import: 'package:flutter_webrtc/flutter_webrtc.dart' • lib/features/call/presentation/screens/active_call_screen.dart:5:8 • unused_import
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check • lib/features/call/presentation/screens/active_call_screen.dart:131:50 • use_build_context_synchronously
+   info • The prefix 'AppDateUtils' isn't a lower_case_with_underscores identifier • lib/features/call/presentation/screens/calls_screen.dart:6:52 • library_prefixes
+warning • Unused import: '../../domain/entities/call_entity.dart' • lib/features/call/presentation/screens/calls_screen.dart:9:8 • unused_import
+   info • The private field _selectedTab could be 'final' • lib/features/call/presentation/screens/calls_screen.dart:28:7 • prefer_final_fields
+   info • The private field _calls could be 'final' • lib/features/call/presentation/screens/calls_screen.dart:29:23 • prefer_final_fields
+warning • The value of the field '_calls' isn't used • lib/features/call/presentation/screens/calls_screen.dart:29:23 • unused_field
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/call/presentation/screens/calls_screen.dart:230:41 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/call/presentation/screens/calls_screen.dart:273:33 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/call/presentation/screens/calls_screen.dart:506:32 • deprecated_member_use
+   info • The prefix 'MessageModel' isn't a lower_case_with_underscores identifier • lib/features/chat/data/repositories/chat_repo_impl.dart:7:61 • library_prefixes
+warning • The value of the field '_socketDataSource' isn't used • lib/features/chat/data/repositories/chat_repo_impl.dart:16:30 • unused_field
+warning • The value of the field '_repository' isn't used • lib/features/chat/domain/usecases/edit_delete_message.dart:7:24 • unused_field
+warning • The value of the field '_repository' isn't used • lib/features/chat/domain/usecases/edit_delete_message.dart:18:24 • unused_field
+warning • The value of the field '_repository' isn't used • lib/features/chat/domain/usecases/receive_message.dart:7:24 • unused_field
+  error • 'chats' isn't a field in the enclosing class • lib/features/chat/presentation/notifiers/chat_controller.dart:15:5 • initializing_formal_for_non_existent_field
+  error • 'isLoading' isn't a field in the enclosing class • lib/features/chat/presentation/notifiers/chat_controller.dart:16:5 • initializing_formal_for_non_existent_field
+  error • 'error' isn't a field in the enclosing class • lib/features/chat/presentation/notifiers/chat_controller.dart:17:5 • initializing_formal_for_non_existent_field
+  error • 'messages' isn't a field in the enclosing class • lib/features/chat/presentation/notifiers/chat_controller.dart:23:9 • initializer_for_non_existent_field
+  error • 'loadingMessages' isn't a field in the enclosing class • lib/features/chat/presentation/notifiers/chat_controller.dart:24:9 • initializer_for_non_existent_field
+  error • The getter 'chats' isn't defined for the type 'ChatState' • lib/features/chat/presentation/notifiers/chat_controller.dart:38:28 • undefined_getter
+  error • The getter 'isLoading' isn't defined for the type 'ChatState' • lib/features/chat/presentation/notifiers/chat_controller.dart:39:36 • undefined_getter
+  error • The getter 'error' isn't defined for the type 'ChatState' • lib/features/chat/presentation/notifiers/chat_controller.dart:40:49 • undefined_getter
+  error • The getter 'messages' isn't defined for the type 'ChatState' • lib/features/chat/presentation/notifiers/chat_controller.dart:41:34 • undefined_getter
+  error • The getter 'loadingMessages' isn't defined for the type 'ChatState' • lib/features/chat/presentation/notifiers/chat_controller.dart:42:48 • undefined_getter
+  error • Undefined name 'messages' • lib/features/chat/presentation/notifiers/chat_controller.dart:50:67 • undefined_identifier
+  error • Undefined name 'messages' • lib/features/chat/presentation/notifiers/chat_controller.dart:64:67 • undefined_identifier
+  error • The getter 'messages' isn't defined for the type 'ChatState' • lib/features/chat/presentation/notifiers/chat_controller.dart:124:41 • undefined_getter
+  error • The getter 'messages' isn't defined for the type 'ChatState' • lib/features/chat/presentation/notifiers/chat_controller.dart:146:82 • undefined_getter
+  error • The getter 'chats' isn't defined for the type 'ChatState' • lib/features/chat/presentation/notifiers/chat_controller.dart:189:56 • undefined_getter
+  error • The getter 'loadingMessages' isn't defined for the type 'ChatState' • lib/features/chat/presentation/notifiers/chat_controller.dart:221:34 • undefined_getter
+  error • The getter 'messages' isn't defined for the type 'ChatState' • lib/features/chat/presentation/notifiers/chat_controller.dart:226:75 • undefined_getter
+  error • The getter 'loadingMessages' isn't defined for the type 'ChatState' • lib/features/chat/presentation/notifiers/chat_controller.dart:231:36 • undefined_getter
+  error • The getter 'loadingMessages' isn't defined for the type 'ChatState' • lib/features/chat/presentation/notifiers/chat_controller.dart:236:36 • undefined_getter
+   info • The prefix 'AppDateUtils' isn't a lower_case_with_underscores identifier • lib/features/chat/presentation/screens/chat_list_screen.dart:8:52 • library_prefixes
+   info • The private field _selectedTab could be 'final' • lib/features/chat/presentation/screens/chat_list_screen.dart:37:7 • prefer_final_fields
+  error • The getter 'chats' isn't defined for the type 'ChatState' • lib/features/chat/presentation/screens/chat_list_screen.dart:138:29 • undefined_getter
+  error • The getter 'isLoading' isn't defined for the type 'ChatState' • lib/features/chat/presentation/screens/chat_list_screen.dart:140:33 • undefined_getter
+warning • The value of the local variable 'fabBottomPadding' isn't used • lib/features/chat/presentation/screens/chat_list_screen.dart:144:11 • unused_local_variable
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/chat/presentation/screens/chat_list_screen.dart:177:32 • deprecated_member_use
+  error • Undefined name 'chatState' • lib/features/chat/presentation/screens/chat_list_screen.dart:306:14 • undefined_identifier
+  error • Undefined name 'chatState' • lib/features/chat/presentation/screens/chat_list_screen.dart:307:13 • undefined_identifier
+  error • Undefined name 'chatState' • lib/features/chat/presentation/screens/chat_list_screen.dart:316:40 • undefined_identifier
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/chat/presentation/screens/chat_list_screen.dart:349:43 • deprecated_member_use
+warning • The value of the local variable 'backgroundColor' isn't used • lib/features/chat/presentation/screens/chat_list_screen.dart:627:11 • unused_local_variable
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/chat/presentation/screens/chat_list_screen.dart:634:64 • deprecated_member_use
+   info • The prefix 'AppDateUtils' isn't a lower_case_with_underscores identifier • lib/features/chat/presentation/screens/chat_screen.dart:7:52 • library_prefixes
+   info • The import of '../notifiers/chat_controller.dart' is unnecessary because all of the used elements are also provided by the import of '../../../../di/providers.dart' • lib/features/chat/presentation/screens/chat_screen.dart:12:8 • unnecessary_import
+   info • The import of '../../../message/presentation/notifiers/message_controller.dart' is unnecessary because all of the used elements are also provided by the import of '../../../../di/providers.dart' • lib/features/chat/presentation/screens/chat_screen.dart:13:8 • unnecessary_import
+   info • The private field _selectedMessages could be 'final' • lib/features/chat/presentation/screens/chat_screen.dart:53:15 • prefer_final_fields
+warning • The value of the local variable 'isSending' isn't used • lib/features/chat/presentation/screens/chat_screen.dart:301:11 • unused_local_variable
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/chat/presentation/screens/chat_screen.dart:516:32 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/chat/presentation/screens/chat_screen.dart:950:51 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/chat/presentation/screens/chat_screen.dart:950:82 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/chat/presentation/screens/chat_screen.dart:991:52 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/chat/presentation/screens/chat_screen.dart:1002:52 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/chat/presentation/screens/chat_screen.dart:1044:37 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/chat/presentation/screens/chat_screen.dart:1320:37 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/chat/presentation/screens/file_viewer_screen.dart:111:35 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/chat/presentation/screens/file_viewer_screen.dart:150:35 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/chat/presentation/screens/file_viewer_screen.dart:199:43 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/chat/presentation/screens/file_viewer_screen.dart:228:35 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/chat/presentation/screens/file_viewer_screen.dart:282:38 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/chat/presentation/screens/file_viewer_screen.dart:294:41 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/chat/presentation/screens/file_viewer_screen.dart:297:43 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/chat/presentation/screens/file_viewer_screen.dart:358:44 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/chat/presentation/screens/file_viewer_screen.dart:393:46 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/chat/presentation/widgets/empty_state.dart:33:46 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/chat/presentation/widgets/empty_state.dart:50:47 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/chat/presentation/widgets/empty_state.dart:120:46 • deprecated_member_use
+   info • The prefix 'AppPermissionHandler' isn't a lower_case_with_underscores identifier • lib/features/contacts/presentation/screens/contact_sync_screen.dart:6:66 • library_prefixes
+warning • The value of the field '_errorMessage' isn't used • lib/features/contacts/presentation/screens/contact_sync_screen.dart:20:11 • unused_field
+warning • The value of the field '_permissionHandler' isn't used • lib/features/contacts/presentation/screens/contact_sync_screen.dart:21:48 • unused_field
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/contacts/presentation/screens/contact_sync_screen.dart:293:34 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/contacts/presentation/screens/contact_sync_screen.dart:302:42 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/contacts/presentation/screens/contact_sync_screen.dart:317:39 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/contacts/presentation/screens/contact_sync_screen.dart:318:39 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/contacts/presentation/screens/contact_sync_screen.dart:325:42 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/contacts/presentation/screens/contact_sync_screen.dart:376:33 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/contacts/presentation/screens/contact_sync_screen.dart:423:38 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/contacts/presentation/screens/contact_sync_screen.dart:441:48 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/contacts/presentation/screens/contact_sync_screen.dart:468:42 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/contacts/presentation/screens/contact_sync_screen.dart:484:44 • deprecated_member_use
+warning • Unused import: '../../data/models/contact_model.dart' • lib/features/contacts/presentation/screens/contacts_list_screen.dart:5:8 • unused_import
+   info • The private field _selectedTab could be 'final' • lib/features/contacts/presentation/screens/contacts_list_screen.dart:25:7 • prefer_final_fields
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/contacts/presentation/screens/contacts_list_screen.dart:187:43 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/contacts/presentation/screens/contacts_list_screen.dart:309:32 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/home/presentation/screens/home_shell.dart:128:32 • deprecated_member_use
+   info • Use interpolation to compose strings and values • lib/features/message/presentation/notifiers/message_controller.dart:89:131 • prefer_interpolation_to_compose_strings
+   info • The import of 'dart:typed_data' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/services.dart' • lib/features/settings/presentation/screens/edit_profile_screen.dart:3:8 • unnecessary_import
+warning • Unused import: '../../../../core/routing/route_names.dart' • lib/features/settings/presentation/screens/edit_profile_screen.dart:10:8 • unused_import
+warning • Unused import: '../../../../di/injection_container.dart' • lib/features/settings/presentation/screens/edit_profile_screen.dart:16:8 • unused_import
+warning • Dead code • lib/features/settings/presentation/screens/edit_profile_screen.dart:73:51 • dead_code
+warning • The left operand can't be null, so the right operand is never executed • lib/features/settings/presentation/screens/edit_profile_screen.dart:73:54 • dead_null_aware_expression
+warning • The declaration '_pickImage' isn't referenced • lib/features/settings/presentation/screens/edit_profile_screen.dart:155:16 • unused_element
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/settings/presentation/screens/edit_profile_screen.dart:399:37 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/settings/presentation/screens/edit_profile_screen.dart:433:31 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/settings/presentation/screens/edit_profile_screen.dart:479:48 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/settings/presentation/screens/edit_profile_screen.dart:486:43 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/settings/presentation/screens/edit_profile_screen.dart:605:48 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/settings/presentation/screens/edit_profile_screen.dart:612:43 • deprecated_member_use
+warning • Unused import: '../../../../di/injection_container.dart' • lib/features/settings/presentation/screens/settings_screen.dart:12:8 • unused_import
+   info • The private field _selectedTab could be 'final' • lib/features/settings/presentation/screens/settings_screen.dart:30:7 • prefer_final_fields
+   info • The private field _isLoadingSessions could be 'final' • lib/features/settings/presentation/screens/settings_screen.dart:33:8 • prefer_final_fields
+warning • The value of the field '_isLoadingSessions' isn't used • lib/features/settings/presentation/screens/settings_screen.dart:33:8 • unused_field
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/settings/presentation/screens/settings_screen.dart:352:80 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/settings/presentation/screens/settings_screen.dart:355:42 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/settings/presentation/screens/settings_screen.dart:355:74 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/settings/presentation/screens/settings_screen.dart:437:51 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/settings/presentation/screens/settings_screen.dart:591:31 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/settings/presentation/screens/settings_screen.dart:622:33 • deprecated_member_use
+warning • The declaration '_buildSectionHeader' isn't referenced • lib/features/settings/presentation/screens/settings_screen.dart:712:10 • unused_element
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/settings/presentation/screens/settings_screen.dart:727:38 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/settings/presentation/screens/settings_screen.dart:820:42 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/settings/presentation/screens/settings_screen.dart:820:74 • deprecated_member_use
+warning • The operand can't be 'null', so the condition is always 'true' • lib/features/settings/presentation/screens/settings_screen.dart:869:49 • unnecessary_null_comparison
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/settings/presentation/screens/settings_screen.dart:956:32 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/user/presentation/screens/user_search_screen.dart:338:43 • deprecated_member_use
+

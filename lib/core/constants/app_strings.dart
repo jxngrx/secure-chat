@@ -2,7 +2,7 @@ class AppStrings {
   AppStrings._();
 
   // App info
-  static const String appName = 'SecureChat';
+  static const String appName = 'NIGHT SPIRITS';
   static const String appVersion = '1.0.0';
 
   // Splash screen
@@ -24,4 +24,8 @@ class AppStrings {
   static const String somethingWentWrong = 'Something went wrong';
   static const String networkError = 'Network error. Please check your connection.';
   static const String unknownError = 'An unknown error occurred';
+
+  // Cloudinary
+  static const String cloudinaryCloudName = 'dkb28cd4o';
+  static const String cloudinaryUploadPreset = 'ml_default';
 }

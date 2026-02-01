@@ -465,7 +465,7 @@ class _CallsScreenState extends ConsumerState<CallsScreen> {
     } else if (difference.inDays == 1) {
       return 'Yesterday';
     } else if (difference.inDays < 7) {
-      return DateFormat('EEEE').format(time);
+      return DateFormat('EEEE').format(time.toLocal());
     } else {
       return 'Last Week';
     }

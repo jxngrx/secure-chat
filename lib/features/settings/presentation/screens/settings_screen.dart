@@ -27,7 +27,7 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  int _selectedTab = 2; // 0: Calls, 1: Chats, 2: Settings
+  int _selectedTab = 1; // 0: Chats, 1: Settings
   bool _isLoading = true;
   bool _isLoadingDevices = false;
   bool _isLoadingSessions = false;
@@ -307,13 +307,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
 
     switch (index) {
-      case 0: // Calls
-        Navigator.pushReplacementNamed(context, RouteNames.calls);
-        break;
-      case 1: // Chats
+      case 0: // Chats
         Navigator.pushReplacementNamed(context, RouteNames.chatList);
         break;
-      case 2: // Settings
+      case 1: // Settings
         // Already on settings, do nothing
         break;
     }
@@ -942,7 +939,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (dateString == null) return 'Unknown';
     try {
       final date = DateTime.parse(dateString);
-      return DateFormat('MMM d, y • h:mm a').format(date);
+      return DateFormat('MMM d, y • h:mm a').format(date.toLocal());
     } catch (e) {
       return dateString;
     }
@@ -967,9 +964,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildNavItem(Icons.call, 'Calls', 0, isDark),
-          _buildNavItem(Icons.chat_bubble, 'Chats', 1, isDark),
-          _buildNavItem(Icons.settings, 'Settings', 2, isDark),
+          _buildNavItem(Icons.chat_bubble, 'Chats', 0, isDark),
+          _buildNavItem(Icons.settings, 'Settings', 1, isDark),
         ],
       ),
     );

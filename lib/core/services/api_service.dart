@@ -11,6 +11,7 @@ import '../../features/media/data/datasources/media_remote_ds.dart';
 import '../network/api_client.dart';
 import '../services/device_info_service.dart';
 import '../utils/logger.dart';
+import '../models/paginated_result.dart';
 
 /// Centralized API Service
 ///
@@ -185,6 +186,7 @@ class ApiService {
     required String appVersion,
     required String platform,
     String? imei,
+    String? fcmToken,
   }) async {
     try {
       final payload = <String, dynamic>{
@@ -199,11 +201,24 @@ class ApiService {
       if (imei != null && imei.isNotEmpty) {
         payload['imei'] = imei;
       }
+      if (fcmToken != null && fcmToken.isNotEmpty) {
+        payload['fcmToken'] = fcmToken;
+      }
 
       final response = await _apiClient.post('/devices/register', payload);
       return response['data'] as Map<String, dynamic>? ?? {};
     } catch (e) {
       Logger.e('Error registering device', e);
+      rethrow;
+    }
+  }
+
+  /// Update FCM token for current device
+  Future<void> updateFcmToken(String fcmToken) async {
+    try {
+      await _apiClient.put('/devices/fcm-token', {'fcmToken': fcmToken});
+    } catch (e) {
+      Logger.e('Error updating FCM token', e);
       rethrow;
     }
   }
@@ -401,14 +416,20 @@ class ApiService {
 
   /// Sync contacts with backend
   ///
-  /// Phone numbers are automatically hashed with SHA-256 before sending.
-  ///
-  /// [phoneNumbers] - List of phone numbers in E.164 format
+  /// [contacts] - List of maps with phoneNumber and contactName:
+  /// [
+  ///   {
+  ///     "phoneNumber": "+1234567890",
+  ///     "contactName": "John Doe"
+  ///   }
+  /// ]
   ///
   /// Returns: List of matched contacts
-  Future<List<Map<String, dynamic>>> syncContacts(List<String> phoneNumbers) async {
+  Future<List<Map<String, dynamic>>> syncContacts(
+    List<Map<String, String>> contacts,
+  ) async {
     try {
-      return await _contactDS.syncContacts(phoneNumbers);
+      return await _contactDS.syncContacts(contacts);
     } catch (e) {
       Logger.e('Error syncing contacts', e);
       rethrow;
@@ -431,10 +452,16 @@ class ApiService {
 
   /// Get all chats for current user
   ///
-  /// Returns: List of chats sorted by lastMessageAt (most recent first)
-  Future<List<Map<String, dynamic>>> getChats() async {
+  /// Returns: Paginated result of chats sorted by lastMessageAt (most recent first)
+  Future<PaginatedResult<Map<String, dynamic>>> getChats({
+    int limit = 50,
+    String? before,
+  }) async {
     try {
-      return await _chatDS.getChats();
+      return await _chatDS.getChats(
+        limit: limit,
+        before: before,
+      );
     } catch (e) {
       Logger.e('Error getting chats', e);
       rethrow;
@@ -501,8 +528,8 @@ class ApiService {
   /// [limit] - Number of messages to fetch (default: 50)
   /// [before] - Message ID to fetch messages before (for pagination)
   ///
-  /// Returns: List of messages (oldest first)
-  Future<List<Map<String, dynamic>>> getChatMessages({
+  /// Returns: Paginated result containing messages and metadata
+  Future<PaginatedResult<Map<String, dynamic>>> getChatMessages({
     required String chatId,
     int limit = 50,
     String? before,

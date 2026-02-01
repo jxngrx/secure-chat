@@ -21,9 +21,15 @@ class Logger {
     }
   }
 
-  static void w(String message) {
+  static void w(String message, [Object? error, StackTrace? stackTrace]) {
     if (kDebugMode) {
       debugPrint('[WARNING] $message');
+      if (error != null) {
+        debugPrint('[WARNING DETAIL] $error');
+      }
+      if (stackTrace != null) {
+        debugPrint('[STACK TRACE] $stackTrace');
+      }
     }
   }
 

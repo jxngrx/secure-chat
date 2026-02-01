@@ -4,23 +4,24 @@ class DateUtils {
   DateUtils._();
 
   static String formatDateTime(DateTime dateTime) {
-    return DateFormat('yyyy-MM-dd HH:mm:ss').format(dateTime);
+    return DateFormat('yyyy-MM-dd HH:mm:ss').format(dateTime.toLocal());
   }
 
   static String formatDate(DateTime date) {
-    return DateFormat('yyyy-MM-dd').format(date);
+    return DateFormat('yyyy-MM-dd').format(date.toLocal());
   }
 
   static String formatTime(DateTime time) {
-    return DateFormat('HH:mm').format(time);
+    return DateFormat('HH:mm').format(time.toLocal());
   }
 
   static String formatRelativeTime(DateTime dateTime) {
     final now = DateTime.now();
-    final difference = now.difference(dateTime);
+    final localDateTime = dateTime.toLocal();
+    final difference = now.difference(localDateTime);
 
     if (difference.inDays > 7) {
-      return formatDate(dateTime);
+      return formatDate(localDateTime);
     } else if (difference.inDays > 0) {
       return '${difference.inDays}d ago';
     } else if (difference.inHours > 0) {

@@ -98,6 +98,115 @@ class ContactService {
     }
   }
 
+  /// Get contacts with phone numbers and names
+  /// 
+  /// Returns: List of maps with phoneNumber and contactName
+  Future<List<Map<String, String>>> getContactsWithNames() async {
+    try {
+      final hasPermission = await this.hasPermission();
+      if (!hasPermission) {
+        Logger.w('Contacts permission not granted');
+        return [];
+      }
+
+      final contacts = await FlutterContacts.getContacts(
+        withProperties: true,
+        withPhoto: false,
+      );
+
+      final contactList = <Map<String, String>>[];
+      final seenPhones = <String>{};
+
+      for (final contact in contacts) {
+        final contactName = contact.name.first;
+        
+        for (final phone in contact.phones) {
+          // Clean phone number: remove spaces, dashes, parentheses
+          var cleaned = phone.number.replaceAll(RegExp(r'[\s\-\(\)]'), '');
+          
+          // Remove leading + if present (we'll add it back)
+          if (cleaned.startsWith('+')) {
+            cleaned = cleaned.substring(1);
+          }
+
+          // Skip if empty or too short
+          if (cleaned.isEmpty || cleaned.length < 7) {
+            continue;
+          }
+
+          // Format as E.164 (assume India +91 if no country code)
+          String formattedPhone;
+          if (cleaned.length == 10) {
+            // 10 digits - assume India (+91)
+            formattedPhone = '+91$cleaned';
+          } else if (cleaned.length > 10 && cleaned.startsWith('91')) {
+            // Already has country code
+            formattedPhone = '+$cleaned';
+          } else if (cleaned.length > 10) {
+            // Has country code but not +91
+            formattedPhone = '+$cleaned';
+          } else {
+            // Too short or invalid, skip
+            continue;
+          }
+
+          // Add to list if not already seen (avoid duplicates)
+          if (!seenPhones.contains(formattedPhone)) {
+            contactList.add({
+              'phoneNumber': formattedPhone,
+              'contactName': contactName,
+            });
+            seenPhones.add(formattedPhone);
+          }
+        }
+      }
+
+      Logger.d('Extracted ${contactList.length} contacts with names');
+      return contactList;
+    } catch (e) {
+      Logger.e('Error reading contacts with names', e);
+      return [];
+    }
+  }
+
+  /// Get contact name by phone number
+  /// 
+  /// Returns the contact name if found, null otherwise
+  Future<String?> getContactName(String phoneNumber) async {
+    try {
+      final hasPermission = await this.hasPermission();
+      if (!hasPermission) {
+        return null;
+      }
+
+      // Clean phone number for comparison
+      final cleaned = phoneNumber.replaceAll(RegExp(r'[\s\-\(\)\+]'), '');
+      
+      final contacts = await FlutterContacts.getContacts(
+        withProperties: true,
+        withPhoto: false,
+      );
+
+      for (final contact in contacts) {
+        for (final phone in contact.phones) {
+          final contactPhone = phone.number.replaceAll(RegExp(r'[\s\-\(\)\+]'), '');
+          
+          // Check if phone numbers match (with or without country code)
+          if (contactPhone == cleaned ||
+              contactPhone.endsWith(cleaned) ||
+              cleaned.endsWith(contactPhone)) {
+            return contact.name.first;
+          }
+        }
+      }
+
+      return null;
+    } catch (e) {
+      Logger.d('Error getting contact name for $phoneNumber: $e');
+      return null;
+    }
+  }
+
   /// Get contact count
   Future<int> getContactCount() async {
     try {

@@ -54,10 +54,9 @@ class CallModel {
       callerId: callerId,
       receiverId: receiverId,
       status: status,
-      startedAt: startedAt,
-      endedAt: endedAt,
-      duration: duration,
-      createdAt: createdAt,
+      startTime: startedAt ?? createdAt,
+      endTime: endedAt,
+      isVideo: false, // Defaulting to false as CallModel doesn't track it yet
     );
   }
 }

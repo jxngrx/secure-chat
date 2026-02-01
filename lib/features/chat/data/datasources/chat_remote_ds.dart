@@ -1,4 +1,5 @@
 import '../../../../core/network/api_client.dart';
+import '../../../../core/models/paginated_result.dart';
 
 class ChatRemoteDataSource {
   ChatRemoteDataSource._();
@@ -8,10 +9,31 @@ class ChatRemoteDataSource {
   final ApiClient _apiClient = ApiClient.instance;
 
   /// Get all user chats
-  Future<List<Map<String, dynamic>>> getChats() async {
-    final response = await _apiClient.get('/chats');
-    final chats = response['data']?['chats'] as List<dynamic>? ?? [];
-    return chats.cast<Map<String, dynamic>>();
+  Future<PaginatedResult<Map<String, dynamic>>> getChats({
+    int limit = 50,
+    String? before,
+  }) async {
+    final queryParams = <String, dynamic>{
+      'limit': limit,
+    };
+    if (before != null) {
+      queryParams['before'] = before;
+    }
+
+    final response = await _apiClient.get('/chats', queryParameters: queryParams);
+
+    final data = response['data'] as Map<String, dynamic>? ?? {};
+    final chats = (data['chats'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+
+    final pagination = data['pagination'] as Map<String, dynamic>? ?? {};
+    final hasMore = pagination['hasMore'] as bool? ?? false;
+    final nextCursor = pagination['nextCursor'] as String?;
+
+    return PaginatedResult(
+      items: chats,
+      hasMore: hasMore,
+      nextCursor: nextCursor,
+    );
   }
 
   /// Get chat by ID
@@ -30,7 +52,7 @@ class ChatRemoteDataSource {
 
   /// Get messages (for backward compatibility)
   Future<List<Map<String, dynamic>>> getMessages(String chatId) async {
-    final response = await _apiClient.get('/messages/chat/$chatId', queryParameters: {'limit': 50});
+    final response = await _apiClient.get('/messages/chat/$chatId', queryParameters: {'limit': 10});
     final messages = response['data']?['messages'] as List<dynamic>? ?? [];
     return messages.cast<Map<String, dynamic>>();
   }

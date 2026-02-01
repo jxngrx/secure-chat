@@ -126,10 +126,10 @@ class _ContactSyncScreenState extends State<ContactSyncScreen> {
   /// Sync contacts with backend
   Future<void> _syncContacts() async {
     try {
-      // Get phone numbers from device contacts
-      final phoneNumbers = await _contactService.getPhoneNumbers();
+      // Get contacts with phone numbers and names
+      final contacts = await _contactService.getContactsWithNames();
 
-      if (phoneNumbers.isEmpty) {
+      if (contacts.isEmpty) {
         if (mounted) {
           setState(() {
             _isLoading = false;
@@ -147,9 +147,8 @@ class _ContactSyncScreenState extends State<ContactSyncScreen> {
         return;
       }
 
-      // Sync contacts with backend via API
-      // ApiService automatically hashes phone numbers
-      final syncedContacts = await _apiService.syncContacts(phoneNumbers);
+      // Sync contacts with backend via API (new format with phoneNumber + contactName)
+      final syncedContacts = await _apiService.syncContacts(contacts);
 
       Logger.d('Synced ${syncedContacts.length} contacts with backend');
 

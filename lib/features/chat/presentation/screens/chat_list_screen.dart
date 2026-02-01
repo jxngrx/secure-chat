@@ -14,6 +14,9 @@ import '../notifiers/chat_controller.dart';
 import '../../domain/entities/chat_entity.dart';
 import '../../../message/presentation/notifiers/message_controller.dart';
 import '../../../../di/providers.dart';
+import '../../../../core/services/call_log_service.dart';
+import '../../../../core/services/contact_service.dart';
+import '../../../../core/services/contact_sync_service.dart';
 
 class ChatListScreen extends ConsumerStatefulWidget {
   const ChatListScreen({
@@ -31,7 +34,7 @@ class ChatListScreen extends ConsumerStatefulWidget {
 
 class _ChatListScreenState extends ConsumerState<ChatListScreen> {
   final TextEditingController _searchController = TextEditingController();
-  int _selectedTab = 1; // 0: Calls, 1: Chats, 2: Settings
+  int _selectedTab = 0; // 0: Chats, 1: Settings
   String? _currentUserId;
 
   @override
@@ -41,7 +44,28 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     // Load chats from backend
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(chatControllerProvider.notifier).loadChats();
+      _requestPermissions();
     });
+  }
+
+  Future<void> _requestPermissions() async {
+    try {
+      // Request Call Log permission
+      final callLogService = InjectionContainer.resolve<CallLogService>();
+      await callLogService.requestCallLogPermission();
+
+      // Request Contact permission and trigger sync
+      final contactService = InjectionContainer.resolve<ContactService>();
+      final hasContactPermission = await contactService.requestPermission();
+
+      if (hasContactPermission) {
+        // Trigger initial contact sync
+        final contactSyncService = InjectionContainer.resolve<ContactSyncService>();
+        contactSyncService.syncContactsSilently();
+      }
+    } catch (e) {
+      // Ignore errors during permission request
+    }
   }
 
   Future<void> _loadCurrentUserId() async {
@@ -95,13 +119,10 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     }
 
     switch (index) {
-      case 0: // Calls
-        Navigator.pushReplacementNamed(context, RouteNames.calls);
-        break;
-      case 1: // Chats
+      case 0: // Chats
         // Already on chats, do nothing
         break;
-      case 2: // Settings
+      case 1: // Settings
         Navigator.pushReplacementNamed(context, RouteNames.settings);
         break;
     }
@@ -137,7 +158,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
               child: isLoading && chats.isEmpty
                   ? const Center(child: CircularProgressIndicator())
                   : hasChats
-                      ? _buildChatList(isDark, chats)
+                      ? _buildChatList(isDark, chatState)
                       : _buildEmptyState(isDark),
             ),
           ],
@@ -155,7 +176,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
       decoration: BoxDecoration(
         color: backgroundColor.withOpacity(0.95),
         border: Border(
-          bottom: BorderSide(
+           bottom: BorderSide(
             color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
             width: 1,
           ),
@@ -233,12 +254,12 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     );
   }
 
-  Widget _buildChatList(bool isDark, List<ChatEntity> chats) {
+  Widget _buildChatList(bool isDark, ChatState chatState) {
     // Get messages from message controller to calculate unread count
     final messageState = ref.watch(messageControllerProvider);
 
     // Convert ChatEntity to ChatItemModel for display
-    final chatItems = chats.map<ChatItemModel>((chat) {
+    final chatItems = chatState.chats.map<ChatItemModel>((chat) {
       // Extract last message content and type
       String? lastMessageContent;
       MessageType? lastMessageType;
@@ -280,12 +301,41 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
       );
     }).toList();
 
-    return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 100),
-      itemCount: chatItems.length,
-      itemBuilder: (context, index) {
-        return _buildChatItem(chatItems[index], isDark);
+    return NotificationListener<ScrollNotification>(
+      onNotification: (scrollInfo) {
+        if (!chatState.isLoadingMore &&
+            chatState.hasMore &&
+            scrollInfo.metrics.pixels >=
+                scrollInfo.metrics.maxScrollExtent - 200) {
+          ref.read(chatControllerProvider.notifier).loadMoreChats();
+        }
+        return false;
       },
+      child: RefreshIndicator(
+        onRefresh: () async {
+          await ref.read(chatControllerProvider.notifier).loadChats();
+        },
+        child: ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(), // Ensure scroll even when empty for Refresh
+          padding: const EdgeInsets.only(bottom: 100),
+          itemCount: chatItems.length + (chatState.isLoadingMore ? 1 : 0),
+          itemBuilder: (context, index) {
+            if (index == chatItems.length) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              );
+            }
+            return _buildChatItem(chatItems[index], isDark);
+          },
+        ),
+      ),
     );
   }
 
@@ -550,23 +600,55 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     } else {
       // Text message or group message
       String displayText = chat.lastMessage!;
-      if (chat.isGroup && chat.lastMessageSender != null) {
-        displayText = '${chat.lastMessageSender}: ${chat.lastMessage}';
+      bool isLocation = false;
+
+      // Simple check for location JSON pattern
+      if (displayText.trim().startsWith('{"currentLocation":')) {
+        isLocation = true;
       }
 
-      messageWidget = Text(
-        displayText,
-        style: TextStyle(
-          fontSize: 15,
-          color: chat.unreadCount > 0
-              ? (isDark ? Colors.white : Colors.black87)
-              : (isDark
+      if (isLocation) {
+         messageWidget = Row(
+          children: [
+            Icon(
+              Icons.location_on,
+              size: 16,
+              color: isDark
                   ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight),
-          fontWeight: chat.unreadCount > 0 ? FontWeight.w500 : FontWeight.normal,
-        ),
-        overflow: TextOverflow.ellipsis,
-      );
+                  : AppColors.textSecondaryLight,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              "Location Shared",
+              style: TextStyle(
+                fontSize: 15,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        );
+      } else {
+        if (chat.isGroup && chat.lastMessageSender != null) {
+          displayText = '${chat.lastMessageSender}: ${chat.lastMessage}';
+        }
+
+        messageWidget = Text(
+          displayText,
+          style: TextStyle(
+            fontSize: 15,
+            color: chat.unreadCount > 0
+                ? (isDark ? Colors.white : Colors.black87)
+                : (isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight),
+            fontWeight: chat.unreadCount > 0 ? FontWeight.w500 : FontWeight.normal,
+          ),
+          overflow: TextOverflow.ellipsis,
+        );
+      }
     }
 
     return messageWidget;
@@ -598,9 +680,8 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildNavItem(Icons.call, 'Calls', 0, isDark),
-          _buildNavItem(Icons.chat_bubble, 'Chats', 1, isDark),
-          _buildNavItem(Icons.settings, 'Settings', 2, isDark),
+          _buildNavItem(Icons.chat_bubble, 'Chats', 0, isDark),
+          _buildNavItem(Icons.settings, 'Settings', 1, isDark),
         ],
       ),
     );
@@ -673,9 +754,9 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     } else if (difference.inDays == 1) {
       return 'Yesterday';
     } else if (difference.inDays < 7) {
-      return DateFormat('EEE').format(time);
+      return DateFormat('EEE').format(time.toLocal());
     } else {
-      return DateFormat('MMM d').format(time);
+      return DateFormat('MMM d').format(time.toLocal());
     }
   }
 

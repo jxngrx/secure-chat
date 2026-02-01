@@ -9,6 +9,10 @@ import 'core/constants/storage_keys.dart';
 import 'core/storage/secure_storage.dart';
 import 'di/injection_container.dart';
 import 'features/call/presentation/widgets/call_global_listener.dart';
+import 'core/services/fcm_service.dart';
+
+// Global navigator key for FCM notification navigation
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 class App extends StatefulWidget {
   const App({super.key});
@@ -59,6 +63,7 @@ class _AppState extends State<App> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: AppStrings.appName,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

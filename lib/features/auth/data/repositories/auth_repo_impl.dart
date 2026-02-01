@@ -27,12 +27,14 @@ class AuthRepositoryImpl implements AuthRepository {
     required String password,
     required String deviceId,
     String? phone,
+    Map<String, dynamic>? location,
   }) async {
     final response = await _remoteDataSource.register(
       username: username,
       password: password,
       deviceId: deviceId,
       phone: phone,
+      location: location,
     );
     return _handleAuthResponse(response, deviceId);
   }
@@ -42,11 +44,13 @@ class AuthRepositoryImpl implements AuthRepository {
     required String username,
     required String password,
     required String deviceId,
+    Map<String, dynamic>? location,
   }) async {
     final response = await _remoteDataSource.login(
       username: username,
       password: password,
       deviceId: deviceId,
+      location: location,
     );
     return _handleAuthResponse(response, deviceId);
   }

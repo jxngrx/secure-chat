@@ -5,6 +5,7 @@ import '../datasources/chat_remote_ds.dart';
 import '../datasources/chat_socket_ds.dart';
 import '../models/chat_model.dart';
 import '../../../message/data/models/message_model.dart' as MessageModel;
+import '../../../../core/models/paginated_result.dart';
 
 class ChatRepositoryImpl implements ChatRepository {
   ChatRepositoryImpl._();
@@ -15,9 +16,16 @@ class ChatRepositoryImpl implements ChatRepository {
   final ChatSocketDataSource _socketDataSource = ChatSocketDataSource.instance;
 
   @override
-  Future<List<ChatEntity>> getChats() async {
-    final response = await _remoteDataSource.getChats();
-    return response
+  Future<PaginatedResult<ChatEntity>> getChats({
+    int limit = 50,
+    String? before,
+  }) async {
+    final result = await _remoteDataSource.getChats(
+      limit: limit,
+      before: before,
+    );
+
+    final entities = result.items
         .map((json) => ChatModel.fromJson(json))
         .map((model) => ChatEntity(
               id: model.id,
@@ -30,6 +38,12 @@ class ChatRepositoryImpl implements ChatRepository {
               unreadCount: model.unreadCount,
             ))
         .toList();
+
+    return PaginatedResult(
+      items: entities,
+      hasMore: result.hasMore,
+      nextCursor: result.nextCursor,
+    );
   }
 
   @override

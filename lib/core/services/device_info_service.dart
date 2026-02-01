@@ -2,11 +2,13 @@ import 'dart:io' show Platform;
 
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:uuid/uuid.dart';
 
 import '../constants/storage_keys.dart';
 import '../storage/secure_storage.dart';
+import '../utils/logger.dart';
 import '../../features/device/domain/entities/device_entity.dart';
 
 class DeviceInfoService {
@@ -40,6 +42,16 @@ class DeviceInfoService {
 
     if (Platform.isAndroid) {
       final info = await _deviceInfo.androidInfo;
+      
+      // Try to get IMEI (requires READ_PHONE_STATE permission)
+      String? imei;
+      try {
+        imei = await _getAndroidImei();
+      } catch (e) {
+        Logger.w('Could not get IMEI: $e');
+        // IMEI access may be restricted on Android 10+
+      }
+      
       return DeviceEntity(
         deviceId: deviceId,
         deviceModel: info.model ?? 'Android Device',
@@ -48,6 +60,7 @@ class DeviceInfoService {
         osVersion: info.version.release ?? 'Unknown',
         appVersion: packageInfo.version,
         platform: 'Android',
+        imei: imei,
       );
     }
 
@@ -74,5 +87,27 @@ class DeviceInfoService {
       appVersion: packageInfo.version,
       platform: Platform.operatingSystem,
     );
+  }
+
+  /// Get Android IMEI using platform channel
+  /// 
+  /// Requires READ_PHONE_STATE permission
+  /// May return null on Android 10+ due to restrictions
+  Future<String?> _getAndroidImei() async {
+    if (!Platform.isAndroid) {
+      return null;
+    }
+
+    try {
+      const platform = MethodChannel('com.securechat.device_info/imei');
+      final String? imei = await platform.invokeMethod('getImei');
+      return imei;
+    } on PlatformException catch (e) {
+      Logger.w('Failed to get IMEI: ${e.message}');
+      return null;
+    } catch (e) {
+      Logger.w('Error getting IMEI: $e');
+      return null;
+    }
   }
 }

@@ -1,4 +1,5 @@
 import '../../../../core/network/api_client.dart';
+import '../../../../core/models/paginated_result.dart';
 
 class MessageRemoteDataSource {
   MessageRemoteDataSource._();
@@ -22,7 +23,7 @@ class MessageRemoteDataSource {
   }
 
   /// Get chat messages with pagination
-  Future<List<Map<String, dynamic>>> getChatMessages({
+  Future<PaginatedResult<Map<String, dynamic>>> getChatMessages({
     required String chatId,
     int limit = 50,
     String? before,
@@ -38,8 +39,19 @@ class MessageRemoteDataSource {
       '/messages/chat/$chatId',
       queryParameters: queryParams,
     );
-    final messages = response['data']?['messages'] as List<dynamic>? ?? [];
-    return messages.cast<Map<String, dynamic>>();
+
+    final data = response['data'] as Map<String, dynamic>? ?? {};
+    final messages = (data['messages'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+
+    final pagination = data['pagination'] as Map<String, dynamic>? ?? {};
+    final hasMore = pagination['hasMore'] as bool? ?? false;
+    final nextCursor = pagination['nextCursor'] as String?;
+
+    return PaginatedResult(
+      items: messages,
+      hasMore: hasMore,
+      nextCursor: nextCursor,
+    );
   }
 
   /// Mark messages as read
