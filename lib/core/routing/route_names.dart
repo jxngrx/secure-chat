@@ -20,6 +20,7 @@ class RouteNames {
   static const String calls = '/calls';
   static const String incomingCall = '/incoming-call';
   static const String outgoingCall = '/outgoing-call';
+  static const String activeCall = '/active-call';
   static const String ongoingCall = '/ongoing-call';
 
   // Contacts routes

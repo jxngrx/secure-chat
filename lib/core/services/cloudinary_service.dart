@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:cloudinary_public/cloudinary_public.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:dio/dio.dart';
 import '../constants/app_strings.dart';
 import '../utils/logger.dart';
 
@@ -28,8 +29,20 @@ class CloudinaryService {
       );
       Logger.d('Image uploaded successfully: ${response.secureUrl}');
       return response.secureUrl;
+    } on CloudinaryException catch (e) {
+      Logger.e('Cloudinary specific error: ${e.message}', e);
+      if (e.message?.contains('preset') ?? false) {
+        Logger.e('TIP: Check if your Cloudinary upload preset is set to "unsigned".');
+      }
+      return null;
+    } on DioException catch (e) {
+      Logger.e('Cloudinary Network Error: ${e.response?.statusCode}', e);
+      if (e.response?.data != null) {
+        Logger.e('Cloudinary Error Data: ${e.response?.data}');
+      }
+      return null;
     } catch (e) {
-      Logger.e('Error uploading image to Cloudinary', e);
+      Logger.e('General error uploading image to Cloudinary', e);
       return null;
     }
   }

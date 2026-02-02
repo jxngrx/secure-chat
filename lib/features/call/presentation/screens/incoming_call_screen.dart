@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../presentation/notifiers/call_controller.dart';
+import '../../../../core/routing/route_names.dart';
 
 
 class IncomingCallScreen extends ConsumerWidget {
@@ -89,10 +90,7 @@ class IncomingCallScreen extends ConsumerWidget {
                         heroTag: 'answer',
                         onPressed: () {
                           controller.answerCall();
-                          // Navigation to ActiveCallScreen is handled by state change listener
-                          // or pushReplacement here depending on flow preference.
-                          // Let's push here for simplicity
-                          Navigator.pushReplacementNamed(context, '/active-call');
+                          Navigator.pushReplacementNamed(context, RouteNames.activeCall);
                           // Wait, routing isn't set up yet.
                           // I should use MaterialPageRoute for now or standard nav.
                         },

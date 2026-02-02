@@ -85,12 +85,12 @@ class LocationService {
     Logger.d('Starting location tracking');
 
     // Update immediately
-    await _updateLocationToBackend();
+    await updateLocationToBackend();
 
     // Then update every 5 minutes
     _locationUpdateTimer = Timer.periodic(
       const Duration(minutes: 5),
-      (_) => _updateLocationToBackend(),
+      (_) => updateLocationToBackend(),
     );
   }
 
@@ -107,7 +107,7 @@ class LocationService {
   }
 
   /// Update location to backend
-  Future<void> _updateLocationToBackend() async {
+  Future<void> updateLocationToBackend() async {
     try {
       final location = await getCurrentLocation();
       if (location == null) {

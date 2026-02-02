@@ -80,14 +80,63 @@ class FCMService {
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional) {
-        // ... (rest of init same)
+        // Get the token
+        _currentFcmToken = await _firebaseMessaging.getToken();
+        Logger.d('FCM Token: $_currentFcmToken');
+
         _setupForegroundMessageHandler();
-        // ...
+        _setupOnTokenRefresh();
+
+        // Listen for when the app is opened from a notification when terminated
+        final initialMessage = await _firebaseMessaging.getInitialMessage();
+        if (initialMessage != null) {
+          _handleNotificationTap(initialMessage);
+        }
+
+        // Listen for when the app is opened from a notification when in background
+        FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
       } else {
         Logger.w('FCM permission denied');
       }
     } catch (e) {
       Logger.e('Error initializing FCM', e);
+    }
+  }
+
+  /// Set up token refresh listener
+  void _setupOnTokenRefresh() {
+    _firebaseMessaging.onTokenRefresh.listen((newToken) {
+      _currentFcmToken = newToken;
+      Logger.d('FCM Token refreshed: $newToken');
+      syncTokenWithBackend();
+    });
+  }
+
+  /// Sync FCM token with backend
+  Future<void> syncTokenWithBackend() async {
+    if (_currentFcmToken == null) {
+      _currentFcmToken = await _firebaseMessaging.getToken();
+    }
+
+    if (_currentFcmToken == null) {
+      Logger.w('Cannot sync FCM token: token is null');
+      return;
+    }
+
+    try {
+      // Check if user is authenticated before syncing
+      final secureStorage = SecureStorage.instance;
+      final token = await secureStorage.read(StorageKeys.authToken);
+
+      if (token != null && token.isNotEmpty) {
+        Logger.d('Syncing FCM token with backend...');
+        await _apiClient.put('/devices/fcm-token', {'fcmToken': _currentFcmToken});
+        Logger.d('FCM token synced successfully');
+      } else {
+        Logger.d('Skipping FCM token sync: user not authenticated');
+      }
+    } catch (e) {
+      Logger.e('Error syncing FCM token with backend', e);
     }
   }
 

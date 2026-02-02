@@ -17,6 +17,9 @@ import '../../features/contacts/presentation/screens/contacts_list_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/settings/presentation/screens/edit_profile_screen.dart';
 import '../../features/user/presentation/screens/user_search_screen.dart';
+import '../../features/call/presentation/screens/incoming_call_screen.dart';
+import '../../features/call/presentation/screens/outgoing_call_screen.dart';
+import '../../features/call/presentation/screens/active_call_screen.dart';
 
 class AppRouter {
   AppRouter._();
@@ -99,6 +102,22 @@ class AppRouter {
       case RouteNames.userSearch:
         return MaterialPageRoute(
           builder: (_) => const UserSearchScreen(),
+        );
+      case RouteNames.incomingCall:
+        return MaterialPageRoute(
+          builder: (_) => const IncomingCallScreen(),
+        );
+      case RouteNames.outgoingCall:
+        final args = settings.arguments as Map<String, dynamic>;
+        return MaterialPageRoute(
+          builder: (_) => OutgoingCallScreen(
+            receiverId: args['receiverId'] as String,
+            receiverName: args['receiverName'] as String,
+          ),
+        );
+      case RouteNames.activeCall:
+        return MaterialPageRoute(
+          builder: (_) => const ActiveCallScreen(),
         );
       case RouteNames.fileViewer:
         final file = settings.arguments;

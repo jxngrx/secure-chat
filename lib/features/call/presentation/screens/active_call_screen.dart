@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../presentation/notifiers/call_controller.dart';
 import '../../../../core/services/webrtc_service.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import '../../../../core/constants/app_colors.dart';
 
 class ActiveCallScreen extends ConsumerStatefulWidget {
   const ActiveCallScreen({super.key});
@@ -12,32 +14,55 @@ class ActiveCallScreen extends ConsumerStatefulWidget {
 }
 
 class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
-  // Renderers not strictly needed for Audio ONLY, but good for visualization/video expansion
-  /*
-  final RTCVideoRenderer _localRenderer = RTCVideoRenderer();
-  final RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
+  Timer? _timer;
+  int _secondsElapsed = 0;
 
   @override
   void initState() {
     super.initState();
-    _initRenderers();
+    _startTimerIfConnected();
   }
 
-  Future<void> _initRenderers() async {
-    await _localRenderer.initialize();
-    await _remoteRenderer.initialize();
-
-    final webRTCService = WebRTCService.instance;
-    // ... attach streams
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
-  */
-  // Skipping renderers for pure audio MVP to avoid black screen confusion
+
+  void _startTimerIfConnected() {
+    final callState = ref.read(callControllerProvider);
+    if (callState.status == CallStatus.connected) {
+      _startTimer();
+    }
+  }
+
+  void _startTimer() {
+    if (_timer != null) return;
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          _secondsElapsed++;
+        });
+      }
+    });
+  }
+
+  String _formatDuration(int seconds) {
+    final minutes = (seconds / 60).floor();
+    final remainingSeconds = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
+  }
 
   @override
   Widget build(BuildContext context) {
     final callState = ref.watch(callControllerProvider);
     final controller = ref.read(callControllerProvider.notifier);
     final call = controller.currentCall;
+
+    // Start timer if call just connected
+    if (callState.status == CallStatus.connected && _timer == null) {
+      _startTimer();
+    }
 
     // Auto-close if call ended
     if (callState.status == CallStatus.ended || callState.status == CallStatus.rejected || callState.status == CallStatus.error) {
@@ -89,7 +114,9 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
                 ),
                  const SizedBox(height: 12),
                 Text(
-                  callState.status == CallStatus.connected ? '00:00' : 'Connecting...', // TODO: Timer
+                  callState.status == CallStatus.connected
+                    ? _formatDuration(_secondsElapsed)
+                    : 'Connecting...',
                   style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 18,
@@ -114,15 +141,23 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.mic, color: Colors.white, size: 32),
+                    icon: Icon(
+                      callState.isMuted ? Icons.mic_off : Icons.mic,
+                      color: callState.isMuted ? Colors.red : Colors.white,
+                      size: 32
+                    ),
                     onPressed: () {
-                      // Toggle Mute
+                      controller.toggleMute();
                     },
                   ),
                   IconButton(
-                    icon: const Icon(Icons.volume_up, color: Colors.white, size: 32),
+                    icon: Icon(
+                      callState.isSpeakerOn ? Icons.volume_up : Icons.volume_down,
+                      color: callState.isSpeakerOn ? AppColors.primary : Colors.white,
+                      size: 32
+                    ),
                     onPressed: () {
-                      // Toggle Speaker
+                      controller.toggleSpeaker();
                     },
                   ),
                   FloatingActionButton(

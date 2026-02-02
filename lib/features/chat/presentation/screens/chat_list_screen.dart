@@ -34,7 +34,7 @@ class ChatListScreen extends ConsumerStatefulWidget {
 
 class _ChatListScreenState extends ConsumerState<ChatListScreen> {
   final TextEditingController _searchController = TextEditingController();
-  int _selectedTab = 0; // 0: Chats, 1: Settings
+  int _selectedTab = 1; // 0: Calls, 1: Chats, 2: Settings
   String? _currentUserId;
 
   @override
@@ -126,10 +126,13 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     }
 
     switch (index) {
-      case 0: // Chats
+      case 0: // Calls
+        Navigator.pushReplacementNamed(context, RouteNames.calls);
+        break;
+      case 1: // Chats
         // Already on chats, do nothing
         break;
-      case 1: // Settings
+      case 2: // Settings
         Navigator.pushReplacementNamed(context, RouteNames.settings);
         break;
     }
@@ -569,7 +572,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
           ),
           const SizedBox(width: 4),
           Text(
-            chat.lastMessage!,
+            'Image',
             style: TextStyle(
               fontSize: 15,
               color: isDark
@@ -592,7 +595,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
           ),
           const SizedBox(width: 4),
           Text(
-            chat.lastMessage!,
+            'Voice message',
             style: TextStyle(
               fontSize: 15,
               color: isDark
@@ -607,14 +610,28 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
       // Text message or group message
       String displayText = chat.lastMessage!;
       bool isLocation = false;
+      bool isImageLink = false;
 
       // Simple check for location JSON pattern
       if (displayText.trim().startsWith('{"currentLocation":')) {
         isLocation = true;
       }
 
+      // Check for image link pattern
+      final trimmedText = displayText.trim().toLowerCase();
+      if (trimmedText.startsWith('http')) {
+        if (trimmedText.contains('res.cloudinary.com') ||
+            trimmedText.endsWith('.jpg') ||
+            trimmedText.endsWith('.jpeg') ||
+            trimmedText.endsWith('.png') ||
+            trimmedText.endsWith('.gif') ||
+            trimmedText.endsWith('.webp')) {
+          isImageLink = true;
+        }
+      }
+
       if (isLocation) {
-         messageWidget = Row(
+        messageWidget = Row(
           children: [
             Icon(
               Icons.location_on,
@@ -626,6 +643,29 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
             const SizedBox(width: 4),
             Text(
               "Location Shared",
+              style: TextStyle(
+                fontSize: 15,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        );
+      } else if (isImageLink) {
+        messageWidget = Row(
+          children: [
+            Icon(
+              Icons.image,
+              size: 16,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              "Image",
               style: TextStyle(
                 fontSize: 15,
                 color: isDark
@@ -686,8 +726,9 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildNavItem(Icons.chat_bubble, 'Chats', 0, isDark),
-          _buildNavItem(Icons.settings, 'Settings', 1, isDark),
+          _buildNavItem(Icons.call, 'Calls', 0, isDark),
+          _buildNavItem(Icons.chat_bubble, 'Chats', 1, isDark),
+          _buildNavItem(Icons.settings, 'Settings', 2, isDark),
         ],
       ),
     );
@@ -780,11 +821,15 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
   }
 
   String _getInitials(String name) {
-    final parts = name.split(' ');
-    if (parts.length >= 2) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    final cleanName = name.trim();
+    if (cleanName.isEmpty) return '?';
+    final parts = cleanName.split(' ').where((s) => s.isNotEmpty).toList();
+    if (parts.length >= 2 && parts[0].isNotEmpty && parts[1].isNotEmpty) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
     }
-    return name.substring(0, name.length > 2 ? 2 : name.length).toUpperCase();
+    return cleanName.length >= 2
+        ? cleanName.substring(0, 2).toUpperCase()
+        : cleanName.toUpperCase();
   }
 
 }

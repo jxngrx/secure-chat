@@ -28,6 +28,9 @@ class CallState {
   final bool isLoading;
   final CallEntity? currentCall;
   final bool isCaller;
+  final bool isMuted;
+  final bool isSpeakerOn;
+  final String? currentUserId;
 
   const CallState({
     this.status = CallStatus.idle,
@@ -35,6 +38,9 @@ class CallState {
     this.isLoading = false,
     this.currentCall,
     this.isCaller = false,
+    this.isMuted = false,
+    this.isSpeakerOn = false,
+    this.currentUserId,
   });
 
   CallState copyWith({
@@ -43,6 +49,9 @@ class CallState {
     bool? isLoading,
     CallEntity? currentCall,
     bool? isCaller,
+    bool? isMuted,
+    bool? isSpeakerOn,
+    String? currentUserId,
   }) {
     return CallState(
       status: status ?? this.status,
@@ -50,6 +59,9 @@ class CallState {
       isLoading: isLoading ?? this.isLoading,
       currentCall: currentCall ?? this.currentCall,
       isCaller: isCaller ?? this.isCaller,
+      isMuted: isMuted ?? this.isMuted,
+      isSpeakerOn: isSpeakerOn ?? this.isSpeakerOn,
+      currentUserId: currentUserId ?? this.currentUserId,
     );
   }
 }
@@ -79,6 +91,7 @@ class CallController extends StateNotifier<CallState> {
       if (userProfileJson != null && userProfileJson.isNotEmpty) {
         final userProfile = jsonDecode(userProfileJson) as Map<String, dynamic>;
         _currentUserId = userProfile['id'] as String?;
+        state = state.copyWith(currentUserId: _currentUserId);
         Logger.d('CallController: Loaded current user ID: $_currentUserId');
       }
     } catch (e) {
@@ -89,6 +102,19 @@ class CallController extends StateNotifier<CallState> {
   // Getters for compatibility
   CallEntity? get currentCall => state.currentCall;
   bool get isCaller => state.isCaller;
+  String? get currentUserId => _currentUserId;
+
+  Future<void> toggleMute() async {
+    final newMuteStatus = !state.isMuted;
+    await _webRTCService.setMicrophoneMute(newMuteStatus);
+    state = state.copyWith(isMuted: newMuteStatus);
+  }
+
+  Future<void> toggleSpeaker() async {
+    final newSpeakerStatus = !state.isSpeakerOn;
+    await _webRTCService.setSpeakerphoneOn(newSpeakerStatus);
+    state = state.copyWith(isSpeakerOn: newSpeakerStatus);
+  }
 
   void _setupListeners() {
     _repository.onIncomingCall.listen(_handleIncomingCall);
@@ -139,7 +165,7 @@ class CallController extends StateNotifier<CallState> {
 
       // Call REST API and process response immediately
       final response = await _repository.initiateCall(receiverId);
-      
+
       Logger.d('CallController: Call initiation response received: $response');
 
       // Extract call data from REST API response
@@ -150,7 +176,7 @@ class CallController extends StateNotifier<CallState> {
       } else if (response['_id'] != null) {
         callId = response['_id'].toString();
       }
-      
+
       // Extract receiverId from response
       String responseReceiverId = receiverId; // Default to parameter
       if (response['receiver'] != null) {
@@ -159,10 +185,10 @@ class CallController extends StateNotifier<CallState> {
           responseReceiverId = receiverData['id'].toString();
         }
       }
-      
+
       // Extract status
       final status = response['status'] as String? ?? 'ringing';
-      
+
       // Extract createdAt
       DateTime startTime = DateTime.now();
       if (response['createdAt'] != null) {
@@ -172,7 +198,7 @@ class CallController extends StateNotifier<CallState> {
           startTime = parsedTime;
         }
       }
-      
+
       // Create CallEntity from REST response immediately
       // This ensures callId is available even if socket event is delayed or missing
       final call = CallEntity(
@@ -190,7 +216,7 @@ class CallController extends StateNotifier<CallState> {
         status: CallStatus.initiating,
         isCaller: true,
       );
-      
+
       Logger.d('CallController: Call state updated from REST response - callId: $callId, receiverId: $responseReceiverId, isCaller: ${state.isCaller}, initiatedAt: $_lastCallInitiationTime');
     } catch (e) {
       Logger.e('CallController: Error initiating call', e);
@@ -221,7 +247,7 @@ class CallController extends StateNotifier<CallState> {
   Future<void> rejectCall() async {
     // CRITICAL: Stop ringtone immediately
     await _stopRingtone();
-    
+
     if (state.currentCall == null) {
       _resetCall();
       return;
@@ -239,7 +265,7 @@ class CallController extends StateNotifier<CallState> {
   Future<void> endCall() async {
     // CRITICAL: Stop ringtone immediately when ending call
     await _stopRingtone();
-    
+
     if (state.currentCall == null) {
       _resetCall();
       return;
@@ -260,7 +286,7 @@ class CallController extends StateNotifier<CallState> {
     // data: { callId, callerId, rtcConfig }
     final callId = data['callId'] as String?;
     final callerId = data['callerId'] as String?;
-    
+
     Logger.d('CallController: Received call:incoming event - callId: $callId, callerId: $callerId, currentUserId: $_currentUserId, isCaller: ${state.isCaller}, status: ${state.status}, lastInitiation: $_lastCallInitiationTime, receiverId: $_receiverId');
 
     // CRITICAL FIX #-1: If we have a receiverId set, we initiated a call - ALWAYS ignore incoming calls
@@ -302,7 +328,7 @@ class CallController extends StateNotifier<CallState> {
       // Normalize both IDs to strings for comparison
       final normalizedCurrentUserId = _currentUserId!.trim();
       final normalizedCallerId = callerId.trim();
-      
+
       if (normalizedCurrentUserId == normalizedCallerId) {
         Logger.w('CallController: Ignoring call:incoming - callerId matches currentUserId (callId: $callId, callerId: $normalizedCallerId, currentUserId: $normalizedCurrentUserId)');
         return;
@@ -351,7 +377,7 @@ class CallController extends StateNotifier<CallState> {
       isCaller: false, // Explicitly set to false to ensure we're marked as receiver
     );
     _playRingtone('incoming');
-    
+
     Logger.d('CallController: Incoming call state set - callId: $callId, isCaller: ${state.isCaller}');
   }
 
@@ -359,7 +385,7 @@ class CallController extends StateNotifier<CallState> {
     // data: { callId, receiverId, rtcConfig? }
     final socketCallId = data['callId'] as String?;
     final socketReceiverId = data['receiverId'] as String?;
-    
+
     Logger.d('CallController: Received call:initiated event - callId: $socketCallId, receiverId: $socketReceiverId, isCaller: ${state.isCaller}, currentCallId: ${state.currentCall?.id}');
 
     if (!state.isCaller) {
@@ -406,7 +432,7 @@ class CallController extends StateNotifier<CallState> {
     state = state.copyWith(
       currentCall: call,
     );
-    
+
     Logger.d('CallController: Call initiated state updated from socket - callId: ${call.id}, receiverId: ${call.receiverId}');
   }
 
@@ -532,19 +558,15 @@ class CallController extends StateNotifier<CallState> {
     try {
       // Stop any existing ringtone first
       await _stopRingtone();
-      
+
       if (type == 'dialing') {
-         // Play a shorter notification or standard ringtone for dialing if desired
-         // There isn't a direct "dialing" sound in system ringtones usually,
-         // often apps use a custom file or just Silence/UI sound.
-         // For now using notification sound as a placeholder or could loop ringtone.
-         // Standard behavior: Caller hears ringing.
-         Logger.d('CallController: Playing dialing ringtone');
+         Logger.d('CallController: Playing dialing feedback');
+         // Use a more appropriate sound for dialing - notification is usually less intrusive than ringtone
          await FlutterRingtonePlayer.play(
-            android: AndroidSounds.ringtone,
-            ios: IosSounds.glass, // or another appropriate sound
+            android: AndroidSounds.notification,
+            ios: IosSounds.glass,
             looping: true,
-            volume: 0.5, // slightly lower for feedback
+            volume: 0.3,
          );
       } else {
         // Incoming call

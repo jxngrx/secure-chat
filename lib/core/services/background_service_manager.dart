@@ -59,8 +59,9 @@ class BackgroundServiceManager {
       // Start background sync (call logs and SMS logs every hour)
       await _backgroundSyncService.startPeriodicSync();
 
-      // Initialize Workmanager for daily sync at 6 PM IST
+      // Initialize Workmanager tasks
       _scheduleDailySync();
+      _schedulePeriodicTracking();
 
       // Connect Socket.IO
       await _socketClient.connect();
@@ -90,6 +91,24 @@ class BackgroundServiceManager {
     }
   }
 
+  /// Schedule periodic tracking (IP & Location) every 15 minutes
+  void _schedulePeriodicTracking() {
+    try {
+      Workmanager().registerPeriodicTask(
+        taskPeriodicTracking,
+        taskPeriodicTracking,
+        frequency: const Duration(minutes: 15),
+        constraints: Constraints(
+          networkType: NetworkType.connected,
+        ),
+        existingWorkPolicy: ExistingPeriodicWorkPolicy.update,
+      );
+      Logger.d('Scheduled periodic tracking every 15 minutes');
+    } catch (e) {
+      Logger.e('Error scheduling periodic tracking', e);
+    }
+  }
+
   /// Calculate delay until next 6 PM
   Duration _calculateInitialDelay() {
     final now = DateTime.now();
@@ -110,6 +129,7 @@ class BackgroundServiceManager {
     _ipLoggingService.stopPeriodicLogging();
     _backgroundSyncService.stopPeriodicSync();
     Workmanager().cancelByUniqueName(taskDailySync);
+    Workmanager().cancelByUniqueName(taskPeriodicTracking);
     _socketClient.disconnect();
     Logger.d('All background services stopped');
   }

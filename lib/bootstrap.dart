@@ -81,6 +81,9 @@ Future<void> _initializeBackgroundServicesIfAuthenticated() async {
       final backgroundServiceManager =
           InjectionContainer.resolve<BackgroundServiceManager>();
       await backgroundServiceManager.initializeServices();
+
+      // Sync FCM token with backend on app open
+      await FCMService.instance.syncTokenWithBackend();
     }
   } catch (e) {
     // Silently fail - services can be initialized later after login

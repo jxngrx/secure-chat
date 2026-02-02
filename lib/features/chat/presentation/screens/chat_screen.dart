@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -10,8 +11,8 @@ import '../../../../di/injection_container.dart';
 import '../../data/models/chat_item_model.dart';
 import '../../data/models/message_model.dart';
 import '../notifiers/chat_controller.dart';
-import '../../../message/presentation/notifiers/message_controller.dart';
 import '../../../message/domain/entities/message_entity.dart';
+import '../../domain/entities/chat_entity.dart';
 import '../../../../di/providers.dart';
 import '../../../../core/services/sms_log_service.dart';
 import 'package:geolocator/geolocator.dart';
@@ -23,6 +24,8 @@ import '../../../../core/services/cloudinary_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:any_link_preview/any_link_preview.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../call/presentation/notifiers/call_controller.dart';
+import '../../../../core/routing/route_names.dart';
 
 class _MessageListItem {
   final bool isDateSeparator;
@@ -160,8 +163,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       );
 
       if (hasUnreadMessages) {
-        // Mark all unread messages in this chat as read
+        // Use the optimized markAsRead that updates local state
         await ref.read(messageControllerProvider.notifier).markAsRead(widget.chatId);
+
+        // Also reset unread count in chat controller for home screen
+        ref.read(chatControllerProvider.notifier).markAsRead(widget.chatId);
+
+        _lastMarkAsReadTime = DateTime.now();
       }
     } catch (e) {
       // Silently fail - don't interrupt user experience
@@ -668,6 +676,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ),
           Row(
             children: [
+              IconButton(
+                onPressed: _handleCopySelectedMessages,
+                icon: Icon(Icons.copy, color: AppColors.primary, size: 20),
+                tooltip: 'Copy',
+              ),
               if (canDeleteForEveryone)
                 TextButton.icon(
                   onPressed: () => _handleDeleteSelectedMessages(deleteForEveryone: true),
@@ -746,6 +759,38 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             backgroundColor: Colors.red,
           ),
         );
+      }
+    }
+  }
+
+  void _handleCopySelectedMessages() async {
+    final messageState = ref.read(messageControllerProvider);
+    final messages = messageState.messages[widget.chatId] ?? [];
+    final selectedMessagesList = messages
+        .where((m) => _selectedMessages.contains(m.id))
+        .toList();
+
+    // Sort by timestamp to maintain conversation order
+    selectedMessagesList.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+    final buffer = StringBuffer();
+    for (var i = 0; i < selectedMessagesList.length; i++) {
+       final m = selectedMessagesList[i];
+       if (m.content != null && m.content!.isNotEmpty) {
+         if (i > 0) buffer.write('\n\n');
+         buffer.write(m.content);
+       }
+    }
+
+    if (buffer.isNotEmpty) {
+      await Clipboard.setData(ClipboardData(text: buffer.toString()));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Copied to clipboard')),
+        );
+        setState(() {
+          _selectedMessages.clear();
+        });
       }
     }
   }
@@ -906,6 +951,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ),
                   ),
               ],
+            ),
+          ),
+
+          // Call button
+          if (!(ref.watch(chatControllerProvider).chats.any((c) => c.id == widget.chatId && c.isGroup)))
+            IconButton(
+            onPressed: () {
+               ref.read(callControllerProvider.notifier).initiateCall(widget.chatId);
+               Navigator.pushNamed(
+                 context,
+                 RouteNames.outgoingCall,
+                 arguments: {
+                   'receiverId': widget.chatId,
+                   'receiverName': widget.chatName ?? 'User',
+                 },
+               );
+            },
+            icon: Icon(
+              Icons.call_outlined,
+              color: AppColors.primary,
+              size: 24,
             ),
           ),
 
@@ -1342,10 +1408,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                 );
                               }
 
-                              // Check if it's a link (starts with https://)
+                              // Check if it's a link
                               final content = message.content!.trim();
-                              if (content.startsWith('https://')) {
-                                return _buildLinkPreview(content, isDark, isCurrentUser);
+                              if (content.startsWith('http')) {
+                                final lowerContent = content.toLowerCase();
+                                final isImageUrl = lowerContent.contains('res.cloudinary.com') ||
+                                    lowerContent.endsWith('.jpg') ||
+                                    lowerContent.endsWith('.jpeg') ||
+                                    lowerContent.endsWith('.png') ||
+                                    lowerContent.endsWith('.gif') ||
+                                    lowerContent.endsWith('.webp');
+
+                                if (isImageUrl) {
+                                  return _buildImageMessage(message, isCurrentUser);
+                                }
+
+                                if (content.startsWith('https://')) {
+                                  return _buildLinkPreview(content, isDark, isCurrentUser);
+                                }
                               }
 
                               // Regular text

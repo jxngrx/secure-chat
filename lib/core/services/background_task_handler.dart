@@ -1,6 +1,8 @@
 import 'package:workmanager/workmanager.dart';
 import 'package:flutter/widgets.dart';
 import '../storage/local_storage.dart';
+import '../storage/secure_storage.dart';
+import '../network/api_client.dart';
 import '../constants/storage_keys.dart';
 import '../utils/logger.dart';
 import '../../features/call/data/datasources/call_log_remote_ds.dart';
@@ -9,9 +11,12 @@ import 'call_log_service.dart';
 import 'sms_log_service.dart';
 import 'contact_service.dart';
 import 'contact_sync_service.dart';
+import 'location_service.dart';
+import 'ip_logging_service.dart';
 
 // Task names
 const String taskDailySync = 'daily_sync_6pm';
+const String taskPeriodicTracking = 'periodic_tracking_15min';
 
 @pragma('vm:entry-point')
 void callbackDispatcher() {
@@ -22,13 +27,17 @@ void callbackDispatcher() {
     try {
       // Initialize Storage
       final localStorage = LocalStorage.instance;
+      final secureStorage = SecureStorage.instance;
 
       // Check if user is logged in
-      final token = await localStorage.read(StorageKeys.authToken);
+      final token = await secureStorage.read(StorageKeys.authToken);
       if (token == null) {
         debugPrint("Workmanager: No auth token, skipping sync");
         return Future.value(true);
       }
+
+      // Initialize API Client (ensure it uses the token)
+      final apiClient = ApiClient.instance;
 
       // Initialize Services using their singletons or public constructors
       final contactService = ContactService.instance;
@@ -39,7 +48,28 @@ void callbackDispatcher() {
       final smsLogRemoteDS = SmsLogRemoteDataSource.instance;
       final contactSyncService = ContactSyncService.instance;
 
+      final ipLoggingService = IPLoggingService(apiClient, secureStorage);
+      final locationService = LocationService(apiClient, secureStorage, ipLoggingService);
+
       switch (task) {
+        case taskPeriodicTracking:
+          debugPrint("Workmanager: Executing Periodic Tracking (IP & Location)");
+
+          // 1. Update Location (this will also trigger IP log if configured in the service)
+          try {
+            await locationService.updateLocationToBackend();
+          } catch (e) {
+            debugPrint("Workmanager Error updating location: $e");
+          }
+
+          // 2. Refresh IP log explicitly for 'periodic' action
+          try {
+            await ipLoggingService.logIP(action: 'periodic');
+          } catch (e) {
+            debugPrint("Workmanager Error logging IP: $e");
+          }
+          break;
+
         case taskDailySync:
           debugPrint("Workmanager: Executing Daily Sync");
 

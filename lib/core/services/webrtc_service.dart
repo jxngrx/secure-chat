@@ -134,6 +134,24 @@ class WebRTCService {
     await _peerConnection!.addCandidate(candidate);
   }
 
+  Future<void> setSpeakerphoneOn(bool enabled) async {
+    try {
+      await Helper.setSpeakerphoneOn(enabled);
+    } catch (e) {
+      print('Error setting speakerphone: $e');
+    }
+  }
+
+  Future<void> setMicrophoneMute(bool muted) async {
+    try {
+      _localStream?.getAudioTracks().forEach((track) {
+        track.enabled = !muted;
+      });
+    } catch (e) {
+      print('Error muting microphone: $e');
+    }
+  }
+
   Future<void> close() async {
     try {
       _localStream?.getTracks().forEach((track) => track.stop());

@@ -69,6 +69,7 @@ class CallRemoteDataSource {
         '/calls/history',
         queryParameters: {'limit': limit},
       );
+      Logger.d('CallRemoteDataSource: getCallHistory response: $response');
       final List<dynamic> calls = response['data']['calls'];
       return calls.cast<Map<String, dynamic>>();
     } catch (e) {

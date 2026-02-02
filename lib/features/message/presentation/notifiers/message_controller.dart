@@ -522,6 +522,24 @@ class MessageController extends StateNotifier<MessageState> {
 
   Future<void> markAsRead(String chatId) async {
     try {
+      // Optimistically update local message statuses
+      final currentMessages = Map<String, List<MessageEntity>>.from(state.messages);
+      final chatMessages = List<MessageEntity>.from(currentMessages[chatId] ?? []);
+
+      bool changed = false;
+      for (int i = 0; i < chatMessages.length; i++) {
+        if (chatMessages[i].status != 'read') {
+          chatMessages[i] = chatMessages[i].copyWith(status: 'read');
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        currentMessages[chatId] = chatMessages;
+        state = state.copyWith(messages: currentMessages);
+        Logger.d('MessageController: Optimistically marked messages as read for chat $chatId');
+      }
+
       await _repository.markAsRead(chatId);
       _socketDataSource.markAsRead(chatId);
     } catch (e) {

@@ -70,14 +70,22 @@ class _CallsScreenState extends ConsumerState<CallsScreen> {
     final backgroundColor = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
     final callState = ref.watch(callControllerProvider);
 
+    final currentUserId = callState.currentUserId;
+
     // Convert CallEntity to CallItemModel for display
     final allCalls = callState.calls.map((call) {
+      final isOutgoing = call.callerId == currentUserId;
+      final otherPartyId = isOutgoing ? call.receiverId : call.callerId;
+      final otherPartyName = isOutgoing
+          ? (call.receiverName ?? 'User $otherPartyId')
+          : (call.callerName ?? 'User $otherPartyId');
+
       return CallItemModel(
         id: call.id,
-        name: 'User ${call.receiverId}', // TODO: Get actual user name
+        name: otherPartyName,
         timestamp: call.startTime,
         type: _mapCallStatusToType(call.status),
-        direction: call.callerId == 'current_user' ? CallDirection.outgoing : CallDirection.incoming,
+        direction: isOutgoing ? CallDirection.outgoing : CallDirection.incoming,
       );
     }).toList();
 
@@ -120,19 +128,8 @@ class _CallsScreenState extends ConsumerState<CallsScreen> {
         children: [
           // Top row with Edit, Filter, and New Call button
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              TextButton(
-                onPressed: () {},
-                child: Text(
-                  'Edit',
-                  style: TextStyle(
-                    color: AppColors.primary,
-                    fontSize: 17,
-                    fontWeight: FontWeight.normal,
-                  ),
-                ),
-              ),
               // Filter buttons
               Container(
                 padding: const EdgeInsets.all(2),
@@ -145,14 +142,6 @@ class _CallsScreenState extends ConsumerState<CallsScreen> {
                     _buildFilterButton('All', 0, isDark),
                     _buildFilterButton('Missed', 1, isDark),
                   ],
-                ),
-              ),
-              IconButton(
-                onPressed: () {}, // TODO: Start new call
-                icon: Icon(
-                  Icons.add_call,
-                  color: AppColors.primary,
-                  size: 26,
                 ),
               ),
             ],
@@ -351,13 +340,32 @@ class _CallsScreenState extends ConsumerState<CallsScreen> {
                     ],
                   ),
                 ),
-                // Info button
+                // Action buttons
                 IconButton(
-                  onPressed: () {}, // TODO: Show call info
+                  onPressed: () {
+                    // Find the other party ID from the call log context
+                    // Since CallItemModel doesn't store the ID directly for 'other party',
+                    // we can infer it or update ItemModel. For now, let's use the log name as fallback
+                    // but better to use the original entity.
+                    // Actually, let's update the item build logic to pass the entity or the ID.
+                    final entity = ref.read(callControllerProvider).calls.firstWhere((c) => c.id == call.id);
+                    final currentUserId = ref.read(callControllerProvider).currentUserId;
+                    final otherId = entity.callerId == currentUserId ? entity.receiverId : entity.callerId;
+
+                    ref.read(callControllerProvider.notifier).initiateCall(otherId);
+                    Navigator.pushNamed(
+                      context,
+                      RouteNames.outgoingCall,
+                      arguments: {
+                        'receiverId': otherId,
+                        'receiverName': call.name,
+                      },
+                    );
+                  },
                   icon: Icon(
-                    Icons.info_outline,
+                    Icons.call_outlined,
                     color: AppColors.primary,
-                    size: 24,
+                    size: 22,
                   ),
                 ),
               ],
@@ -570,11 +578,15 @@ class _CallsScreenState extends ConsumerState<CallsScreen> {
   }
 
   String _getInitials(String name) {
-    final parts = name.split(' ');
-    if (parts.length >= 2) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    final cleanName = name.trim();
+    if (cleanName.isEmpty) return '?';
+    final parts = cleanName.split(' ').where((s) => s.isNotEmpty).toList();
+    if (parts.length >= 2 && parts[0].isNotEmpty && parts[1].isNotEmpty) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
     }
-    return name.substring(0, name.length > 2 ? 2 : name.length).toUpperCase();
+    return cleanName.length >= 2
+        ? cleanName.substring(0, 2).toUpperCase()
+        : cleanName.toUpperCase();
   }
 
   CallType _mapCallStatusToType(String status) {

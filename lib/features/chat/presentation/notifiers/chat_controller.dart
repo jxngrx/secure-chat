@@ -168,31 +168,30 @@ class ChatController extends StateNotifier<ChatState> {
       try {
         final chatId = data['chatId'] as String?;
         if (chatId != null) {
-          final currentMessages = state.messages[chatId] ?? [];
-          final updatedMessages = currentMessages.map((msg) {
+          // Update messages map (if present)
+          final List<MessageEntity> currentMessages = state.messages[chatId] ?? [];
+          final updatedMessages = currentMessages.map<MessageEntity>((msg) {
             if (msg.status != 'read') {
-              return MessageEntity(
-                id: msg.id,
-                chatId: msg.chatId,
-                senderId: msg.senderId,
-                senderName: msg.senderName,
-                senderAvatar: msg.senderAvatar,
-                content: msg.content,
-                type: msg.type,
-                timestamp: msg.timestamp,
-                status: 'read',
-                editedAt: msg.editedAt,
-                mediaUrl: msg.mediaUrl,
-                mediaSize: msg.mediaSize,
-                voiceDuration: msg.voiceDuration,
-              );
+              return msg.copyWith(status: 'read');
             }
             return msg;
           }).toList();
 
           final updatedMessagesMap = Map<String, List<MessageEntity>>.from(state.messages);
           updatedMessagesMap[chatId] = updatedMessages;
-          state = state.copyWith(messages: updatedMessagesMap);
+
+          // Update CHATS list (Home Screen) - Reset unread count
+          final currentChats = List<ChatEntity>.from(state.chats);
+          final chatIndex = currentChats.indexWhere((c) => c.id == chatId);
+
+          if (chatIndex != -1) {
+            currentChats[chatIndex] = currentChats[chatIndex].copyWith(unreadCount: 0);
+          }
+
+          state = state.copyWith(
+            messages: updatedMessagesMap,
+            chats: currentChats,
+          );
         }
       } catch (e) {
         Logger.e('Error handling message read receipt', e);
@@ -203,6 +202,22 @@ class ChatController extends StateNotifier<ChatState> {
     _socketDataSource.onChatUpdated((data) {
       loadChats(); // Reload chats when updated
     });
+  }
+
+  Future<void> markAsRead(String chatId) async {
+    try {
+      // Optimistically reset unread count for this chat in the list
+      final currentChats = List<ChatEntity>.from(state.chats);
+      final chatIndex = currentChats.indexWhere((c) => c.id == chatId);
+
+      if (chatIndex != -1) {
+        currentChats[chatIndex] = currentChats[chatIndex].copyWith(unreadCount: 0);
+        state = state.copyWith(chats: currentChats);
+        Logger.d('ChatController: Optimistically reset unread count for chat $chatId');
+      }
+    } catch (e) {
+      Logger.e('Error resetting unread count locally', e);
+    }
   }
 
   Future<void> loadChats() async {

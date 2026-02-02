@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../notifiers/call_controller.dart';
 import '../screens/incoming_call_screen.dart';
+import '../../../../core/routing/route_names.dart';
+import '../../../../app.dart';
 
 class CallGlobalListener extends ConsumerWidget {
   final Widget child;
@@ -17,18 +19,20 @@ class CallGlobalListener extends ConsumerWidget {
         final controller = ref.read(callControllerProvider.notifier);
         final wasInitiating = previous?.status == CallStatus.initiating;
         final isCaller = controller.isCaller;
-        
+
         // Don't show incoming call screen if:
         // 1. We're marked as the caller
         // 2. Previous status was initiating (we were calling)
         if (!isCaller && !wasInitiating) {
-          Navigator.push(
-            context,
+          navigatorKey.currentState?.push(
             MaterialPageRoute(builder: (_) => const IncomingCallScreen()),
           );
         }
       } else if (next.status == CallStatus.connected) {
-         // Handle connection if needed
+         // Auto-transition to ActiveCallScreen if we just connected
+         if (previous?.status != CallStatus.connected) {
+           navigatorKey.currentState?.pushReplacementNamed(RouteNames.activeCall);
+         }
       }
     });
 
