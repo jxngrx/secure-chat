@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
@@ -9,6 +10,7 @@ import '../../domain/entities/call_entity.dart';
 import '../../../../core/utils/logger.dart';
 import '../../../../core/storage/local_storage.dart';
 import '../../../../core/constants/storage_keys.dart';
+import '../../../../core/permissions/permission_utils.dart';
 import '../../../../di/injection_container.dart';
 
 enum CallStatus {
@@ -81,6 +83,7 @@ class CallController extends StateNotifier<CallState> {
   // WebRTC Signaling State
   Map<String, dynamic>? _pendingOffer;
   final List<Map<String, dynamic>> _pendingIceCandidates = [];
+  Timer? _callTimeoutTimer;
 
   CallController(this._repository) : super(const CallState()) {
     _loadCurrentUserId();
@@ -148,10 +151,19 @@ class CallController extends StateNotifier<CallState> {
     }
   }
 
-  Future<void> initiateCall(String receiverId) async {
+  Future<bool> initiateCall(String receiverId) async {
     if (state.status != CallStatus.idle) {
       Logger.w('CallController: Cannot initiate call - not idle (status: ${state.status})');
-      return;
+      return false;
+    }
+
+    // Check for microphone permission
+    final hasPermission = await PermissionUtils.instance.checkAndRequestMicrophonePermission();
+    if (!hasPermission) {
+      Logger.w('CallController: Microphone permission denied');
+      state = state.copyWith(status: CallStatus.error);
+      _resetCallIn(const Duration(seconds: 2));
+      return false;
     }
 
     Logger.d('CallController: Initiating call to $receiverId (currentUserId: $_currentUserId)');
@@ -224,15 +236,43 @@ class CallController extends StateNotifier<CallState> {
       );
 
       Logger.d('CallController: Call state updated from REST response - callId: $callId, receiverId: $responseReceiverId, isCaller: ${state.isCaller}, initiatedAt: $_lastCallInitiationTime');
+
+      // Start timeout timer for outgoing call
+      _startCallTimeout();
+      return true;
     } catch (e) {
       Logger.e('CallController: Error initiating call', e);
       state = state.copyWith(status: CallStatus.error);
       _resetCallIn(const Duration(seconds: 2));
+      return false;
     }
+  }
+
+  void _startCallTimeout() {
+    _callTimeoutTimer?.cancel();
+    _callTimeoutTimer = Timer(const Duration(seconds: 45), () {
+      if (state.status == CallStatus.initiating || state.status == CallStatus.ringing) {
+        Logger.w('CallController: Call timed out');
+        endCall();
+      }
+    });
+  }
+
+  void _stopCallTimeout() {
+    _callTimeoutTimer?.cancel();
+    _callTimeoutTimer = null;
   }
 
   Future<void> answerCall() async {
     if (state.currentCall == null) return;
+
+    // Check for microphone permission
+    final hasPermission = await PermissionUtils.instance.checkAndRequestMicrophonePermission();
+    if (!hasPermission) {
+      Logger.w('CallController: Microphone permission denied, rejecting call');
+      rejectCall();
+      return;
+    }
 
     try {
       state = state.copyWith(status: CallStatus.connecting);
@@ -443,6 +483,7 @@ class CallController extends StateNotifier<CallState> {
   }
 
   void _handleCallAnswered(dynamic data) {
+    _stopCallTimeout();
     if (state.isCaller) {
       _stopRingtone(); // Stop dialing sound
       _initializeWebRTC(CallRole.caller);
@@ -456,12 +497,14 @@ class CallController extends StateNotifier<CallState> {
   }
 
   void _handleCallRejected(dynamic data) {
+    _stopCallTimeout();
     state = state.copyWith(status: CallStatus.rejected);
     _stopRingtone();
     _resetCallIn(const Duration(seconds: 2));
   }
 
   void _handleCallEnded(dynamic data) {
+    _stopCallTimeout();
     state = state.copyWith(status: CallStatus.ended);
     _stopRingtone();
     _resetCall();
@@ -631,6 +674,7 @@ class CallController extends StateNotifier<CallState> {
   }
 
   void _resetCall() {
+    _stopCallTimeout();
     _webRTCService.close();
     _lastCallInitiationTime = null; // Reset initiation time
     _receiverId = null; // Reset receiver ID
@@ -656,6 +700,7 @@ class CallController extends StateNotifier<CallState> {
 
   @override
   void dispose() {
+    _stopCallTimeout();
     _stopRingtone(); // Ensure it stops
     super.dispose();
   }

@@ -13,10 +13,14 @@ class IncomingCallScreen extends ConsumerWidget {
     final controller = ref.read(callControllerProvider.notifier);
     final call = controller.currentCall;
 
-    // Auto-dismiss if call ended or not ringing
-    if (call == null || callState.status != CallStatus.ringing) {
+    // Auto-dismiss if call ended or not ringing (but don't pop if we are connecting/connected as GlobalListener handles that)
+    if (call == null || (callState.status != CallStatus.ringing &&
+        callState.status != CallStatus.connecting &&
+        callState.status != CallStatus.connected)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) Navigator.pop(context);
+        if (context.mounted && Navigator.canPop(context)) {
+          Navigator.pop(context);
+        }
       });
       return const Scaffold(backgroundColor: Colors.black);
     }

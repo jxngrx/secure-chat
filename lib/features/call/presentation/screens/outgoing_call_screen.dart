@@ -14,7 +14,21 @@ class OutgoingCallScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final callState = ref.watch(callControllerProvider);
     final controller = ref.read(callControllerProvider.notifier);
+
+    // Auto-dismiss if call ended, rejected, or error
+    if (callState.status == CallStatus.rejected ||
+        callState.status == CallStatus.ended ||
+        callState.status == CallStatus.error ||
+        (callState.status == CallStatus.idle && callState.currentCall == null)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted && Navigator.canPop(context)) {
+          Navigator.pop(context);
+        }
+      });
+      return const Scaffold(backgroundColor: Colors.black);
+    }
 
     return Scaffold(
       backgroundColor: Colors.black,
