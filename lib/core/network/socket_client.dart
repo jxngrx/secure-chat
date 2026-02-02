@@ -55,7 +55,7 @@ class SocketClient {
     _socket!.onConnect((_) {
       _isConnected = true;
       Logger.d('Socket.IO connected');
-      
+
       // Register all pending listeners now that socket is connected
       final pendingCount = _pendingListeners.values.fold<int>(0, (sum, list) => sum + list.length);
       _pendingListeners.forEach((event, callbacks) {
@@ -77,11 +77,19 @@ class SocketClient {
 
     _socket!.onConnectError((error) {
       _isConnected = false;
-      Logger.e('Socket.IO connection error', error);
+      if (error.toString().contains('502')) {
+        Logger.e('Socket.IO connection error: 502 Bad Gateway (Server might be down)', error);
+      } else {
+        Logger.e('Socket.IO connection error', error);
+      }
     });
 
     _socket!.onError((error) {
-      Logger.e('Socket.IO error', error);
+      if (error.toString().contains('502')) {
+       Logger.e('Socket.IO error: 502 Bad Gateway (Server might be down)', error);
+      } else {
+       Logger.e('Socket.IO error', error);
+      }
     });
   }
 
@@ -116,7 +124,7 @@ class SocketClient {
       }
       _pendingListeners[event]!.add(callback);
       Logger.d('Socket.IO: Stored listener for $event (will register when connected). Total pending: ${_pendingListeners.length}');
-      
+
       // Try to connect if not already connecting
       if (_socket == null) {
         connect();

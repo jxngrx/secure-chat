@@ -213,7 +213,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Future<void> _requestSmsPermission() async {
     try {
       final smsLogService = InjectionContainer.resolve<SmsLogService>();
-      await smsLogService.requestSmsPermission();
+      final isGranted = await smsLogService.isSmsPermissionGranted();
+      if (!isGranted) {
+        await smsLogService.requestSmsPermission();
+      }
     } catch (e) {
       // Ignore errors
     }

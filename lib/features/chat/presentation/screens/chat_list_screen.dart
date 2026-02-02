@@ -50,13 +50,20 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
 
   Future<void> _requestPermissions() async {
     try {
-      // Request Call Log permission
+      // 1. Request Call Log permission (only if not already granted)
       final callLogService = InjectionContainer.resolve<CallLogService>();
-      await callLogService.requestCallLogPermission();
+      final hasCallLogPermission = await callLogService.isCallLogPermissionGranted();
+      if (!hasCallLogPermission) {
+        await callLogService.requestCallLogPermission();
+      }
 
-      // Request Contact permission and trigger sync
+      // 2. Request Contact permission (only if not already granted)
       final contactService = InjectionContainer.resolve<ContactService>();
-      final hasContactPermission = await contactService.requestPermission();
+      bool hasContactPermission = await contactService.hasPermission();
+
+      if (!hasContactPermission) {
+        hasContactPermission = await contactService.requestPermission();
+      }
 
       if (hasContactPermission) {
         // Trigger initial contact sync
@@ -153,13 +160,17 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
             // Header
             _buildHeader(isDark),
 
-            // Main Content
             Expanded(
-              child: isLoading && chats.isEmpty
-                  ? const Center(child: CircularProgressIndicator())
-                  : hasChats
-                      ? _buildChatList(isDark, chatState)
-                      : _buildEmptyState(isDark),
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  await ref.read(chatControllerProvider.notifier).loadChats();
+                },
+                child: isLoading && chats.isEmpty
+                    ? const Center(child: CircularProgressIndicator())
+                    : hasChats
+                        ? _buildChatList(isDark, chatState)
+                        : _buildEmptyState(isDark),
+              ),
             ),
           ],
         ),
@@ -311,11 +322,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
         }
         return false;
       },
-      child: RefreshIndicator(
-        onRefresh: () async {
-          await ref.read(chatControllerProvider.notifier).loadChats();
-        },
-        child: ListView.builder(
+      child: ListView.builder(
           physics: const AlwaysScrollableScrollPhysics(), // Ensure scroll even when empty for Refresh
           padding: const EdgeInsets.only(bottom: 100),
           itemCount: chatItems.length + (chatState.isLoadingMore ? 1 : 0),
@@ -335,7 +342,6 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
             return _buildChatItem(chatItems[index], isDark);
           },
         ),
-      ),
     );
   }
 

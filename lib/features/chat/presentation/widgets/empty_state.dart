@@ -16,8 +16,11 @@ class EmptyChatState extends StatelessWidget {
     final backgroundColor = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
     final surfaceColor = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
 
-    return Center(
-      child: Padding(
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Container(
+        height: MediaQuery.of(context).size.height * 0.7, // Take most of the height to allow scrolling
+        alignment: Alignment.center,
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -32,7 +35,7 @@ class EmptyChatState extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppColors.primary.withOpacity(0.1),
                     shape: BoxShape.circle,
-                  ),
+                   ),
                 ),
                 // Main icon
                 Positioned.fill(

@@ -8,13 +8,30 @@ class SmsLogService {
   SmsLogService(this._contactService);
 
   final ContactService _contactService;
+  bool _isRequestingPermission = false;
+
   /// Request SMS permission
   Future<bool> requestSmsPermission() async {
+    if (_isRequestingPermission) {
+      Logger.d('SMS permission request already in progress, skipping');
+      return false;
+    }
+
     try {
-      // Use the telephony plugin's own permission request to avoid "Reply already submitted" crash
-      // which happens when both permission_handler and telephony try to handle the same result.
+      _isRequestingPermission = true;
+
+      // First check if already granted to avoid unnecessary plugin calls
+      // which cause the "Reply already submitted" crash.
+      final alreadyGranted = await isSmsPermissionGranted();
+      if (alreadyGranted) {
+        Logger.d('SMS permission already granted');
+        return true;
+      }
+
+      // Use the telephony plugin's own permission request
       final telephony = Telephony.instance;
-      return await telephony.requestSmsPermissions ?? false;
+      final result = await telephony.requestSmsPermissions ?? false;
+      return result;
     } catch (e) {
       Logger.e('Error requesting SMS permission', e);
       // Fallback to permission_handler if telephony fails
@@ -25,6 +42,8 @@ class SmsLogService {
         Logger.e('Error in fallback SMS permission request', e2);
         return false;
       }
+    } finally {
+      _isRequestingPermission = false;
     }
   }
 
