@@ -22,91 +22,135 @@ class IncomingCallScreen extends ConsumerWidget {
     }
 
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            const Spacer(),
-
-            // Caller info
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const CircleAvatar(
-                  radius: 60,
-                  backgroundColor: Color(0xFF333333),
-                  child: Icon(Icons.person, size: 60, color: Colors.white),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  call.callerId, // TODO: Resolve name from Contact Service
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'Incoming call',
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontSize: 16,
-                  ),
-                ),
-              ],
-            ),
-
-            const Spacer(),
-
-            // Call controls
-            Padding(
-              padding: const EdgeInsets.only(bottom: 60, left: 40, right: 40),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      backgroundColor: const Color(0xFF0F0F0F),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.black.withOpacity(0.8),
+              const Color(0xFF121212),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              const SizedBox(height: 80),
+              // Caller info
+              Column(
                 children: [
-                  // Reject button
-                  Column(
-                    children: [
-                      FloatingActionButton(
-                        heroTag: 'reject',
-                        onPressed: () {
-                          controller.rejectCall();
-                          Navigator.pop(context);
-                        },
-                        backgroundColor: Colors.red,
-                        child: const Icon(Icons.call_end, color: Colors.white),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text('Decline', style: TextStyle(color: Colors.white70)),
-                    ],
+                  Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white24, width: 2),
+                      color: const Color(0xFF1C1C1E),
+                    ),
+                    child: const Icon(Icons.person, size: 80, color: Colors.white70),
                   ),
-
-                  // Answer button
-                  Column(
-                    children: [
-                      FloatingActionButton(
-                        heroTag: 'answer',
-                        onPressed: () {
-                          controller.answerCall();
-                          Navigator.pushReplacementNamed(context, RouteNames.activeCall);
-                          // Wait, routing isn't set up yet.
-                          // I should use MaterialPageRoute for now or standard nav.
-                        },
-                        backgroundColor: Colors.green,
-                        child: const Icon(Icons.call, color: Colors.white),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text('Accept', style: TextStyle(color: Colors.white70)),
-                    ],
+                  const SizedBox(height: 24),
+                  Text(
+                    call.callerName ?? 'User ${call.callerId.substring(call.callerId.length > 5 ? call.callerId.length - 5 : 0)}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 32,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'INCOMING VOICE CALL',
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 2,
+                    ),
                   ),
                 ],
               ),
-            ),
-          ],
+
+              const Spacer(),
+
+              // Call controls
+              Padding(
+                padding: const EdgeInsets.only(bottom: 80, left: 50, right: 50),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Reject button
+                    _buildCallAction(
+                      icon: Icons.call_end,
+                      label: 'Decline',
+                      color: Colors.redAccent,
+                      onTap: () {
+                        controller.rejectCall();
+                        Navigator.pop(context);
+                      },
+                    ),
+
+                    // Answer button
+                    _buildCallAction(
+                      icon: Icons.call,
+                      label: 'Accept',
+                      color: const Color(0xFF2E7D32),
+                      onTap: () {
+                        controller.answerCall();
+                        // Navigation is handled by CallGlobalListener or manually here
+                        // navigatorKey is already pushing ActiveCall on status == connected
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _buildCallAction({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: color,
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.3),
+                  blurRadius: 15,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: Icon(icon, color: Colors.white, size: 32),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
     );
   }
 }

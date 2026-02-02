@@ -98,28 +98,48 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
              Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const CircleAvatar(
-                  radius: 80,
-                  backgroundColor: Color(0xFF333333),
-                  child: Icon(Icons.person, size: 80, color: Colors.white),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  call?.receiverId ?? call?.callerId ?? 'Unknown',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
+                Container(
+                  width: 140,
+                  height: 140,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white12, width: 2),
+                    color: const Color(0xFF1C1C1E),
                   ),
+                  child: const Icon(Icons.person, size: 100, color: Colors.white70),
+                ),
+                const SizedBox(height: 32),
+                Builder(
+                  builder: (context) {
+                    final currentUserId = callState.currentUserId;
+                    final isOutgoing = call?.callerId == currentUserId;
+                    final otherName = isOutgoing
+                        ? (call?.receiverName ?? 'User ${call?.receiverId.substring(call.receiverId.length > 5 ? call.receiverId.length - 5 : 0)}')
+                        : (call?.callerName ?? 'User ${call?.callerId.substring(call.callerId.length > 5 ? call.callerId.length - 5 : 0)}');
+
+                    return Text(
+                      otherName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 32,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                      ),
+                    );
+                  },
                 ),
                  const SizedBox(height: 12),
                 Text(
                   callState.status == CallStatus.connected
                     ? _formatDuration(_secondsElapsed)
-                    : 'Connecting...',
-                  style: const TextStyle(
-                    color: Colors.white70,
+                    : callState.status == CallStatus.connecting
+                        ? 'Connecting...'
+                        : 'Dialing...',
+                  style: TextStyle(
+                    color: callState.status == CallStatus.connected ? AppColors.primary : Colors.white54,
                     fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 1,
                   ),
                 ),
               ],

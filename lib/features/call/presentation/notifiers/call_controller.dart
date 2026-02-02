@@ -78,6 +78,10 @@ class CallController extends StateNotifier<CallState> {
     {'urls': 'stun:stun1.l.google.com:19302'},
   ];
 
+  // WebRTC Signaling State
+  Map<String, dynamic>? _pendingOffer;
+  final List<Map<String, dynamic>> _pendingIceCandidates = [];
+
   CallController(this._repository) : super(const CallState()) {
     _loadCurrentUserId();
     _setupListeners();
@@ -117,6 +121,7 @@ class CallController extends StateNotifier<CallState> {
   }
 
   void _setupListeners() {
+    Logger.d('CallController: Setting up socket listeners via repository...');
     _repository.onIncomingCall.listen(_handleIncomingCall);
     _repository.onCallInitiated.listen(_handleCallInitiated);
     _repository.onCallAnswered.listen(_handleCallAnswered);
@@ -127,6 +132,7 @@ class CallController extends StateNotifier<CallState> {
     _repository.onWebRTCOffer.listen(_handleWebRTCOffer);
     _repository.onWebRTCAnswer.listen(_handleWebRTCAnswer);
     _repository.onWebRTCIceCandidate.listen(_handleWebRTCIceCandidate);
+    Logger.d('CallController: Socket listeners initialized successfully.');
   }
 
   // --- Actions ---
@@ -479,20 +485,43 @@ class CallController extends StateNotifier<CallState> {
       });
 
       _webRTCService.connectionState.listen((connState) {
+        Logger.d('CallController: WebRTC Connection State: $connState');
         if (connState == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
            state = state.copyWith(status: CallStatus.connected);
-        } else if (connState == RTCPeerConnectionState.RTCPeerConnectionStateFailed) {
-           endCall();
+        } else if (connState == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
+                   connState == RTCPeerConnectionState.RTCPeerConnectionStateDisconnected) {
+           // Don't immediately end on disconnect, might reconnect
+           if (connState == RTCPeerConnectionState.RTCPeerConnectionStateFailed) {
+             endCall();
+           }
         }
       });
 
       if (role == CallRole.caller) {
+        Logger.d('CallController: Creating WebRTC Offer...');
         final offer = await _webRTCService.createOffer();
         _repository.sendWebRTCOffer(
           state.currentCall!.id,
           _webRTCService.sessionDescriptionToMap(offer),
           state.currentCall!.receiverId,
         );
+      } else {
+        // Receiver role: Check for pending offer
+        if (_pendingOffer != null) {
+          Logger.d('CallController: Processing pending WebRTC Offer...');
+          await _processOffer(_pendingOffer!);
+          _pendingOffer = null;
+        }
+
+        // Process any pending ICE candidates
+        if (_pendingIceCandidates.isNotEmpty) {
+          Logger.d('CallController: Processing ${_pendingIceCandidates.length} pending ICE candidates...');
+          for (final candidateMap in _pendingIceCandidates) {
+            final candidate = _webRTCService.mapToIceCandidate(candidateMap);
+            await _webRTCService.addIceCandidate(candidate);
+          }
+          _pendingIceCandidates.clear();
+        }
       }
     } catch (e) {
       Logger.e('Error initializing WebRTC', e);
@@ -502,21 +531,37 @@ class CallController extends StateNotifier<CallState> {
 
   void _handleWebRTCOffer(dynamic data) {
     if (state.isCaller) return;
-    if (state.status != CallStatus.connecting && state.status != CallStatus.ringing) return;
 
     final offerMap = data['offer'];
     final callId = data['callId'];
 
     if (offerMap != null) {
+      if (state.status == CallStatus.connecting || state.status == CallStatus.connected) {
+        // We are already initialized or connected, process immediately
+        _processOffer(offerMap);
+      } else {
+        // Too early, store it
+        Logger.d('CallController: Storing WebRTC Offer for later processing');
+        _pendingOffer = offerMap;
+      }
+    }
+  }
+
+  Future<void> _processOffer(Map<String, dynamic> offerMap) async {
+    try {
       final offer = _webRTCService.mapToSessionDescription(offerMap);
-      _webRTCService.setRemoteDescription(offer).then((_) async {
-        final answer = await _webRTCService.createAnswer();
+      await _webRTCService.setRemoteDescription(offer);
+      final answer = await _webRTCService.createAnswer();
+
+      if (state.currentCall != null) {
         _repository.sendWebRTCAnswer(
-          callId,
+          state.currentCall!.id,
           _webRTCService.sessionDescriptionToMap(answer),
-          data['callerId'],
+          state.currentCall!.callerId,
         );
-      });
+      }
+    } catch (e) {
+      Logger.e('Error processing WebRTC offer', e);
     }
   }
 
@@ -533,8 +578,15 @@ class CallController extends StateNotifier<CallState> {
   void _handleWebRTCIceCandidate(dynamic data) {
     final candidateMap = data['candidate'];
     if (candidateMap != null) {
-      final candidate = _webRTCService.mapToIceCandidate(candidateMap);
-      _webRTCService.addIceCandidate(candidate);
+      if (state.status == CallStatus.connecting || state.status == CallStatus.connected) {
+        final candidate = _webRTCService.mapToIceCandidate(candidateMap);
+        _webRTCService.addIceCandidate(candidate).catchError((e) {
+          Logger.e('Error adding ICE candidate', e);
+        });
+      } else {
+        Logger.d('CallController: Storing ICE candidate for later processing');
+        _pendingIceCandidates.add(candidateMap);
+      }
     }
   }
 
@@ -583,6 +635,11 @@ class CallController extends StateNotifier<CallState> {
     _lastCallInitiationTime = null; // Reset initiation time
     _receiverId = null; // Reset receiver ID
     _stopRingtone(); // Ensure ringtone is stopped
+
+    // Clear signaling state
+    _pendingOffer = null;
+    _pendingIceCandidates.clear();
+
     // Don't reset state to idle instantly if we want to show "Ended" screen
     state = state.copyWith(
       currentCall: null,
