@@ -18,6 +18,7 @@ class CallRepositoryImpl implements CallRepository {
   final _callConnectedController = StreamController<dynamic>.broadcast();
   final _callRejectedController = StreamController<dynamic>.broadcast();
   final _callEndedController = StreamController<dynamic>.broadcast();
+  final _callErrorController = StreamController<dynamic>.broadcast();
   final _webRTCOfferController = StreamController<dynamic>.broadcast();
   final _webRTCAnswerController = StreamController<dynamic>.broadcast();
   final _webRTCIceCandidateController = StreamController<dynamic>.broadcast();
@@ -33,6 +34,7 @@ class CallRepositoryImpl implements CallRepository {
     _socketDS.onCallConnected((data) => _callConnectedController.add(data));
     _socketDS.onCallRejected((data) => _callRejectedController.add(data));
     _socketDS.onCallEnded((data) => _callEndedController.add(data));
+    _socketDS.onCallError((data) => _callErrorController.add(data));
 
     _socketDS.onWebRTCOffer((data) => _webRTCOfferController.add(data));
     _socketDS.onWebRTCAnswer((data) => _webRTCAnswerController.add(data));
@@ -52,6 +54,8 @@ class CallRepositoryImpl implements CallRepository {
   @override
   Stream<dynamic> get onCallEnded => _callEndedController.stream;
   @override
+  Stream<dynamic> get onCallError => _callErrorController.stream;
+  @override
   Stream<dynamic> get onWebRTCOffer => _webRTCOfferController.stream;
   @override
   Stream<dynamic> get onWebRTCAnswer => _webRTCAnswerController.stream;
@@ -59,23 +63,23 @@ class CallRepositoryImpl implements CallRepository {
   Stream<dynamic> get onWebRTCIceCandidate => _webRTCIceCandidateController.stream;
 
   @override
-  Future<Map<String, dynamic>> initiateCall(String receiverId) async {
-    return _remoteDS.initiateCall(receiverId);
+  Future<void> initiateCall(String receiverId) async {
+    _socketDS.initiateCall(receiverId);
   }
 
   @override
-  Future<Map<String, dynamic>> answerCall(String callId) async {
-    return _remoteDS.answerCall(callId);
+  Future<void> answerCall(String callId) async {
+    _socketDS.answerCall(callId);
   }
 
   @override
   Future<void> rejectCall(String callId) async {
-    return _remoteDS.rejectCall(callId);
+    _socketDS.rejectCall(callId);
   }
 
   @override
   Future<void> endCall(String callId) async {
-    return _remoteDS.endCall(callId);
+    _socketDS.endCall(callId);
   }
 
   @override
@@ -107,6 +111,7 @@ class CallRepositoryImpl implements CallRepository {
     _callConnectedController.close();
     _callRejectedController.close();
     _callEndedController.close();
+    _callErrorController.close();
     _webRTCOfferController.close();
     _webRTCAnswerController.close();
     _webRTCIceCandidateController.close();

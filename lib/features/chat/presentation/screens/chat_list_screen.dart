@@ -726,7 +726,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildNavItem(Icons.call, 'Calls', 0, isDark),
+          // _buildNavItem(Icons.call, 'Calls', 0, isDark),
           _buildNavItem(Icons.chat_bubble, 'Chats', 1, isDark),
           _buildNavItem(Icons.settings, 'Settings', 2, isDark),
         ],

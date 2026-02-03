@@ -14,7 +14,6 @@ import '../notifiers/chat_controller.dart';
 import '../../../message/domain/entities/message_entity.dart';
 import '../../domain/entities/chat_entity.dart';
 import '../../../../di/providers.dart';
-import '../../../../core/services/sms_log_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:map_launcher/map_launcher.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -87,10 +86,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       }
     });
 
-    // Request SMS permission when entering chat
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _requestSmsPermission();
-    });
 
     // Listen to text changes to update send button
     _messageController.addListener(() {
@@ -218,17 +213,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
-  Future<void> _requestSmsPermission() async {
-    try {
-      final smsLogService = InjectionContainer.resolve<SmsLogService>();
-      final isGranted = await smsLogService.isSmsPermissionGranted();
-      if (!isGranted) {
-        await smsLogService.requestSmsPermission();
-      }
-    } catch (e) {
-      // Ignore errors
-    }
-  }
 
   Future<void> _loadCurrentUserId() async {
     try {
@@ -954,19 +938,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
           ),
 
+          /*
           // Call button
           if (!(ref.watch(chatControllerProvider).chats.any((c) => c.id == widget.chatId && c.isGroup)))
             IconButton(
-            onPressed: () {
-               ref.read(callControllerProvider.notifier).initiateCall(widget.chatId);
-               Navigator.pushNamed(
-                 context,
-                 RouteNames.outgoingCall,
-                 arguments: {
-                   'receiverId': widget.chatId,
-                   'receiverName': widget.chatName ?? 'User',
-                 },
-               );
+            onPressed: () async {
+               final success = await ref.read(callControllerProvider.notifier).initiateCall(widget.chatId);
+               if (success && context.mounted) {
+                 Navigator.pushNamed(
+                   context,
+                   RouteNames.outgoingCall,
+                   arguments: {
+                     'receiverId': widget.chatId,
+                     'receiverName': widget.chatName ?? 'User',
+                   },
+                 );
+               }
             },
             icon: Icon(
               Icons.call_outlined,
@@ -974,6 +961,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               size: 24,
             ),
           ),
+          */
 
           // Edit button (menu with delete option)
           PopupMenuButton<String>(

@@ -87,26 +87,6 @@ class PermissionHandler {
     }
   }
 
-  /// Request SMS permission
-  /// Returns true if granted, false otherwise
-  Future<bool> requestSmsPermission() async {
-    try {
-      final status = await ph.Permission.sms.request();
-      return status.isGranted;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  /// Check if SMS permission is granted
-  Future<bool> isSmsPermissionGranted() async {
-    try {
-      final status = await ph.Permission.sms.status;
-      return status.isGranted;
-    } catch (e) {
-      return false;
-    }
-  }
 
   /// Request phone state permission (for IMEI)
   /// Returns true if granted, false otherwise

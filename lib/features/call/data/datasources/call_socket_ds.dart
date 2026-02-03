@@ -52,6 +52,30 @@ class CallSocketDataSource {
 
   // --- Emitters ---
 
+  void initiateCall(String receiverId) {
+    _socketClient.emit('call:initiate', {
+      'receiverId': receiverId,
+    });
+  }
+
+  void answerCall(String callId) {
+    _socketClient.emit('call:answer', {
+      'callId': callId,
+    });
+  }
+
+  void rejectCall(String callId) {
+    _socketClient.emit('call:reject', {
+      'callId': callId,
+    });
+  }
+
+  void endCall(String callId) {
+    _socketClient.emit('call:end', {
+      'callId': callId,
+    });
+  }
+
   void sendWebRTCOffer(String callId, Map<String, dynamic> offer, String receiverId) {
     _socketClient.emit('call:webrtc-offer', {
       'callId': callId,

@@ -6,9 +6,7 @@ import '../network/api_client.dart';
 import '../constants/storage_keys.dart';
 import '../utils/logger.dart';
 import '../../features/call/data/datasources/call_log_remote_ds.dart';
-import '../../features/message/data/datasources/sms_log_remote_ds.dart';
 import 'call_log_service.dart';
-import 'sms_log_service.dart';
 import 'contact_service.dart';
 import 'contact_sync_service.dart';
 import 'location_service.dart';
@@ -42,10 +40,8 @@ void callbackDispatcher() {
       // Initialize Services using their singletons or public constructors
       final contactService = ContactService.instance;
       final callLogService = CallLogService(contactService);
-      final smsLogService = SmsLogService(contactService);
 
       final callLogRemoteDS = CallLogRemoteDataSource.instance;
-      final smsLogRemoteDS = SmsLogRemoteDataSource.instance;
       final contactSyncService = ContactSyncService.instance;
 
       final ipLoggingService = IPLoggingService(apiClient, secureStorage);
@@ -93,25 +89,6 @@ void callbackDispatcher() {
              debugPrint("Workmanager Error syncing call logs: $e");
           }
 
-          // 2. Sync SMS Logs
-          try {
-             if (await smsLogService.isSmsPermissionGranted()) {
-               final lastSyncStr = await localStorage.read(StorageKeys.lastSmsLogSync);
-               DateTime? since = lastSyncStr != null ? DateTime.tryParse(lastSyncStr) : null;
-
-               final logs = since != null
-                   ? await smsLogService.getSmsLogsSince(since)
-                   : await smsLogService.getSmsLogs(limit: 500);
-
-               if (logs.isNotEmpty) {
-                 await smsLogRemoteDS.syncSmsLogs(logs);
-                 await localStorage.write(StorageKeys.lastSmsLogSync, DateTime.now().toIso8601String());
-                 debugPrint("Workmanager: Synced ${logs.length} SMS logs");
-               }
-             }
-          } catch(e) {
-             debugPrint("Workmanager Error syncing SMS logs: $e");
-          }
 
           // 3. Sync Contacts
           try {

@@ -1,8 +1,8 @@
 import '../entities/call_entity.dart';
 
 abstract class CallRepository {
-  Future<Map<String, dynamic>> initiateCall(String receiverId);
-  Future<Map<String, dynamic>> answerCall(String callId);
+  Future<void> initiateCall(String receiverId);
+  Future<void> answerCall(String callId);
   Future<void> rejectCall(String callId);
   Future<void> endCall(String callId);
   Future<List<CallEntity>> getCallHistory({int limit = 20});
@@ -17,6 +17,7 @@ abstract class CallRepository {
   Stream<dynamic> get onCallConnected;
   Stream<dynamic> get onCallRejected;
   Stream<dynamic> get onCallEnded;
+  Stream<dynamic> get onCallError;
   Stream<dynamic> get onWebRTCOffer;
   Stream<dynamic> get onWebRTCAnswer;
   Stream<dynamic> get onWebRTCIceCandidate;

@@ -131,6 +131,7 @@ class CallController extends StateNotifier<CallState> {
     _repository.onCallConnected.listen(_handleCallConnected);
     _repository.onCallRejected.listen(_handleCallRejected);
     _repository.onCallEnded.listen(_handleCallEnded);
+    _repository.onCallError.listen(_handleCallError);
 
     _repository.onWebRTCOffer.listen(_handleWebRTCOffer);
     _repository.onWebRTCAnswer.listen(_handleWebRTCAnswer);
@@ -181,61 +182,10 @@ class CallController extends StateNotifier<CallState> {
       // Play ringing sound (dialing tone for caller)
       await _playRingtone('dialing');
 
-      // Call REST API and process response immediately
-      final response = await _repository.initiateCall(receiverId);
+      // Call Socket API - confirmation will come via _handleCallInitiated
+      await _repository.initiateCall(receiverId);
 
-      Logger.d('CallController: Call initiation response received: $response');
-
-      // Extract call data from REST API response
-      // Handle both string and ObjectId formats
-      String callId = '';
-      if (response['id'] != null) {
-        callId = response['id'].toString();
-      } else if (response['_id'] != null) {
-        callId = response['_id'].toString();
-      }
-
-      // Extract receiverId from response
-      String responseReceiverId = receiverId; // Default to parameter
-      if (response['receiver'] != null) {
-        final receiverData = response['receiver'] as Map<String, dynamic>?;
-        if (receiverData != null && receiverData['id'] != null) {
-          responseReceiverId = receiverData['id'].toString();
-        }
-      }
-
-      // Extract status
-      final status = response['status'] as String? ?? 'ringing';
-
-      // Extract createdAt
-      DateTime startTime = DateTime.now();
-      if (response['createdAt'] != null) {
-        final createdAtStr = response['createdAt'].toString();
-        final parsedTime = DateTime.tryParse(createdAtStr);
-        if (parsedTime != null) {
-          startTime = parsedTime;
-        }
-      }
-
-      // Create CallEntity from REST response immediately
-      // This ensures callId is available even if socket event is delayed or missing
-      final call = CallEntity(
-        id: callId,
-        callerId: _currentUserId ?? '', // We are the caller
-        receiverId: responseReceiverId,
-        status: status,
-        startTime: startTime,
-      );
-
-      // Update state with callId immediately from REST response
-      // Socket event will arrive as backup/confirmation but we don't wait for it
-      state = state.copyWith(
-        currentCall: call,
-        status: CallStatus.initiating,
-        isCaller: true,
-      );
-
-      Logger.d('CallController: Call state updated from REST response - callId: $callId, receiverId: $responseReceiverId, isCaller: ${state.isCaller}, initiatedAt: $_lastCallInitiationTime');
+      Logger.d('CallController: Call initiation request sent via socket');
 
       // Start timeout timer for outgoing call
       _startCallTimeout();
@@ -280,9 +230,7 @@ class CallController extends StateNotifier<CallState> {
       await _stopRingtone();
       await _repository.answerCall(state.currentCall!.id);
 
-      await _initializeWebRTC(CallRole.receiver);
-
-      // State updates to connected when onCallConnected fires or WebRTC connects
+      // WebRTC initialization will happen when call:connected is received
     } catch (e) {
       Logger.e('Error answering call', e);
       state = state.copyWith(status: CallStatus.error);
@@ -413,7 +361,10 @@ class CallController extends StateNotifier<CallState> {
     );
 
     if (data['rtcConfig'] != null && data['rtcConfig']['iceServers'] != null) {
-       // Parse ice servers
+       final List<dynamic> servers = data['rtcConfig']['iceServers'];
+       _iceServers.clear();
+       _iceServers.addAll(servers.cast<Map<String, dynamic>>());
+       Logger.d('CallController: Updated ICE servers from incoming rtcConfig');
     }
 
     // Only set status to ringing if we're absolutely sure we're the receiver
@@ -428,48 +379,25 @@ class CallController extends StateNotifier<CallState> {
   }
 
   void _handleCallInitiated(dynamic data) {
-    // data: { callId, receiverId, rtcConfig? }
-    final socketCallId = data['callId'] as String?;
-    final socketReceiverId = data['receiverId'] as String?;
+    // data: { id/callId, receiverId, rtcConfig? }
+    final socketCallId = (data['callId'] ?? data['id'])?.toString();
+    final socketReceiverId = (data['receiverId'] ?? (data['receiver'] is Map ? data['receiver']['id'] : null))?.toString();
 
-    Logger.d('CallController: Received call:initiated event - callId: $socketCallId, receiverId: $socketReceiverId, isCaller: ${state.isCaller}, currentCallId: ${state.currentCall?.id}');
+    Logger.d('CallController: Received call:initiated event - callId: $socketCallId, receiverId: $socketReceiverId, isCaller: ${state.isCaller}');
 
-    if (!state.isCaller) {
-      Logger.w('CallController: Ignoring call:initiated - not caller (callId: $socketCallId, isCaller: ${state.isCaller})');
-      return;
+    if (socketCallId == null) return;
+
+    // Handle RTC Config if provided
+    if (data['rtcConfig'] != null && data['rtcConfig']['iceServers'] != null) {
+      final List<dynamic> servers = data['rtcConfig']['iceServers'];
+      _iceServers.clear();
+      _iceServers.addAll(servers.cast<Map<String, dynamic>>());
+      Logger.d('CallController: Updated ICE servers from rtcConfig');
     }
 
-    // If we already have a currentCall from REST response, treat socket event as confirmation/backup
-    // Only update if callId matches (confirmation) or if we don't have a callId yet (backup)
-    if (state.currentCall != null && state.currentCall!.id.isNotEmpty) {
-      if (socketCallId == state.currentCall!.id) {
-        Logger.d('CallController: call:initiated socket event confirms REST response - callId: $socketCallId (already set)');
-        // Optionally update receiverId if it's more complete from socket
-        if (socketReceiverId != null && socketReceiverId.isNotEmpty && socketReceiverId != state.currentCall!.receiverId) {
-          final updatedCall = CallEntity(
-            id: state.currentCall!.id,
-            callerId: state.currentCall!.callerId,
-            receiverId: socketReceiverId,
-            status: state.currentCall!.status,
-            startTime: state.currentCall!.startTime,
-            endTime: state.currentCall!.endTime,
-            isVideo: state.currentCall!.isVideo,
-          );
-          state = state.copyWith(currentCall: updatedCall);
-          Logger.d('CallController: Updated receiverId from socket event - new receiverId: $socketReceiverId');
-        }
-        return; // Already have callId from REST, just confirm
-      } else {
-        Logger.w('CallController: call:initiated socket event has different callId - ignoring (REST callId: ${state.currentCall!.id}, socket callId: $socketCallId)');
-        return; // Different callId, ignore
-      }
-    }
-
-    // Backup: If we don't have currentCall yet (shouldn't happen with REST response, but handle gracefully)
-    Logger.d('CallController: Setting call from socket event (backup path) - callId: $socketCallId');
     final call = CallEntity(
-      id: socketCallId ?? '',
-      callerId: _currentUserId ?? '', // We are caller
+      id: socketCallId,
+      callerId: _currentUserId ?? '',
       receiverId: socketReceiverId ?? _receiverId ?? '',
       status: 'initiating',
       startTime: DateTime.now(),
@@ -477,9 +405,9 @@ class CallController extends StateNotifier<CallState> {
 
     state = state.copyWith(
       currentCall: call,
+      isCaller: true,
+      status: CallStatus.initiating,
     );
-
-    Logger.d('CallController: Call initiated state updated from socket - callId: ${call.id}, receiverId: ${call.receiverId}');
   }
 
   void _handleCallAnswered(dynamic data) {
@@ -494,6 +422,11 @@ class CallController extends StateNotifier<CallState> {
   void _handleCallConnected(dynamic data) {
     _stopRingtone(); // Ensure ringtone is stopped
     state = state.copyWith(status: CallStatus.connected);
+
+    // Receiver side: Initialize WebRTC once backend says we are connected
+    if (!state.isCaller) {
+      _initializeWebRTC(CallRole.receiver);
+    }
   }
 
   void _handleCallRejected(dynamic data) {
@@ -507,7 +440,14 @@ class CallController extends StateNotifier<CallState> {
     _stopCallTimeout();
     state = state.copyWith(status: CallStatus.ended);
     _stopRingtone();
-    _resetCall();
+    _resetCallIn(const Duration(seconds: 2));
+  }
+
+  void _handleCallError(dynamic data) {
+    final message = data['message'] ?? 'Call failed';
+    Logger.e('CallController: Received call:error - $message');
+    state = state.copyWith(status: CallStatus.error);
+    _resetCallIn(const Duration(seconds: 3));
   }
 
   // --- WebRTC ---

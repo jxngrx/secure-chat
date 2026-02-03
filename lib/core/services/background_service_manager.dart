@@ -56,7 +56,7 @@ class BackgroundServiceManager {
       // Start IP logging (periodic every 15 minutes)
       await _ipLoggingService.startPeriodicLogging();
 
-      // Start background sync (call logs and SMS logs every hour)
+      // Start background sync (call logs and contacts every hour)
       await _backgroundSyncService.startPeriodicSync();
 
       // Initialize Workmanager tasks

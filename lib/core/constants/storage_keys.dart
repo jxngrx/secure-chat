@@ -8,5 +8,4 @@ class StorageKeys {
   static const userProfile = 'user_profile';
   static const fcmToken = 'fcm_token';
   static const lastCallLogSync = 'last_call_log_sync';
-  static const lastSmsLogSync = 'last_sms_log_sync';
 }
