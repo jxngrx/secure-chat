@@ -9,6 +9,8 @@ import '../../../../core/storage/secure_storage.dart';
 import '../../../../core/storage/local_storage.dart';
 import '../../../../di/injection_container.dart';
 import '../../../../core/utils/logger.dart';
+import '../../../../core/services/fcm_service.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -45,12 +47,21 @@ class _SplashScreenState extends State<SplashScreen>
 
       if (!mounted) return;
 
+      // CRITICAL: Check notification permission before proceeding
+      final permissionStatus = await FCMService.instance.checkPermission();
+      if (permissionStatus != AuthorizationStatus.authorized &&
+          permissionStatus != AuthorizationStatus.provisional) {
+        if (!mounted) return;
+        Logger.d('Notification permission not granted, redirecting to permission screen');
+        Navigator.pushReplacementNamed(context, RouteNames.notificationPermission);
+        return;
+      }
+
       // Check if user is authenticated
       final secureStorage = InjectionContainer.resolve<SecureStorage>();
       final localStorage = InjectionContainer.resolve<LocalStorage>();
 
       final authToken = await secureStorage.read(StorageKeys.authToken);
-      final sessionId = await secureStorage.read(StorageKeys.sessionId);
 
       if (authToken != null && authToken.isNotEmpty) {
         // User is authenticated, check if they have username

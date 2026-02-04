@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../network/api_client.dart';
@@ -16,12 +15,26 @@ import '../../app.dart' show navigatorKey;
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   Logger.d('FCM Background message received: ${message.messageId}');
   Logger.d('FCM Background message data: ${message.data}');
-  Logger.d('FCM Background message notification: ${message.notification?.title}');
+
+  if (message.data['type'] == 'call_incoming') {
+    // Notify about incoming call via static stream
+    FCMService.emitCallReceived(message.data);
+
+    // For background calls, we show a high-priority notification with full-screen intent
+    await FCMService.instance.showCallNotification(message);
+  }
 }
 
 class FCMService {
   FCMService._();
   static final FCMService instance = FCMService._();
+
+  static final _callStreamController = StreamController<Map<String, dynamic>>.broadcast();
+  static Stream<Map<String, dynamic>> get onCallReceived => _callStreamController.stream;
+
+  static void emitCallReceived(Map<String, dynamic> data) {
+    _callStreamController.add(data);
+  }
 
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
   final ApiClient _apiClient = ApiClient.instance;
@@ -32,7 +45,7 @@ class FCMService {
 
   /// Initialize FCM service
   /// Should be called after Firebase is initialized
-  Future<void> initialize() async {
+  Future<AuthorizationStatus> initialize() async {
     try {
       // Initialize Local Notifications
       const AndroidInitializationSettings initializationSettingsAndroid =
@@ -45,11 +58,7 @@ class FCMService {
       await _flutterLocalNotificationsPlugin.initialize(
         settings: initializationSettings,
         onDidReceiveNotificationResponse: (NotificationResponse response) {
-          if (response.payload != null) {
-              // Handle notification tap from local notification
-              // We can't access RemoteMessage directly here easily, but we can pass data in payload
-              // Payload string can be identifying info.
-          }
+          _handleLocalNotificationTap(response);
         },
       );
 
@@ -61,9 +70,21 @@ class FCMService {
         importance: Importance.max,
       );
 
-      await _flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(channel);
+      // Create Dedicated Call Channel for Android
+      const AndroidNotificationChannel callChannel = AndroidNotificationChannel(
+        'calls_channel', // id
+        'Incoming Calls', // title
+        description: 'This channel is used for incoming call notifications.', // description
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+      );
+
+      final androidPlugin = _flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+
+      await androidPlugin?.createNotificationChannel(channel);
+      await androidPlugin?.createNotificationChannel(callChannel);
 
       // Request notification permissions
       final settings = await _firebaseMessaging.requestPermission(
@@ -98,9 +119,17 @@ class FCMService {
       } else {
         Logger.w('FCM permission denied');
       }
+      return settings.authorizationStatus;
     } catch (e) {
       Logger.e('Error initializing FCM', e);
+      return AuthorizationStatus.notDetermined;
     }
+  }
+
+  /// Check current notification permission status
+  Future<AuthorizationStatus> checkPermission() async {
+    final settings = await _firebaseMessaging.getNotificationSettings();
+    return settings.authorizationStatus;
   }
 
   /// Set up token refresh listener
@@ -114,9 +143,7 @@ class FCMService {
 
   /// Sync FCM token with backend
   Future<void> syncTokenWithBackend() async {
-    if (_currentFcmToken == null) {
-      _currentFcmToken = await _firebaseMessaging.getToken();
-    }
+    _currentFcmToken ??= await _firebaseMessaging.getToken();
 
     if (_currentFcmToken == null) {
       Logger.w('Cannot sync FCM token: token is null');
@@ -140,13 +167,15 @@ class FCMService {
     }
   }
 
-  // ... (Token handling same)
-
   /// Set up foreground message handler
   void _setupForegroundMessageHandler() {
     _foregroundSubscription?.cancel();
     _foregroundSubscription = FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       Logger.d('FCM Foreground message received: ${message.messageId}');
+
+      if (message.data['type'] == 'call_incoming') {
+        FCMService.emitCallReceived(message.data);
+      }
 
       // Handle foreground notification (Show Local Notification)
       _handleForegroundNotification(message);
@@ -160,7 +189,9 @@ class FCMService {
     Map<String, dynamic> data = message.data;
 
     // Only show if we have a notification payload or it's a message type
-    if (notification != null && android != null) {
+    if (data['type'] == 'call_incoming') {
+      showCallNotification(message);
+    } else if (notification != null && android != null) {
         _flutterLocalNotificationsPlugin.show(
             id: notification.hashCode,
             title: notification.title,
@@ -173,21 +204,13 @@ class FCMService {
                 icon: android.smallIcon,
                 priority: Priority.max,
                 importance: Importance.max,
-                // Add color if needed
               ),
             ),
-            payload: data['chatId'], // Pass chat ID if available
+            payload: data['chatId'],
         );
     } else if (data['type'] == 'message') {
-        // If data-only message (no notification block), construct one
-        // This is common for chat apps to avoid double notification in background vs foreground
-        // But backend usually sends notification block.
-        // If your backend sends 'data' only, we construct it.
         String title = data['senderName'] ?? 'New Message';
         String body = data['content'] ?? 'You have a new message';
-
-        // Don't show if simple text check fails or logic says so.
-        // But requested is "Show it".
 
         _flutterLocalNotificationsPlugin.show(
             id: message.hashCode,
@@ -205,6 +228,78 @@ class FCMService {
             ),
              payload: data['chatId'],
         );
+    }
+  }
+
+  /// Show a high-priority call notification
+  Future<void> showCallNotification(RemoteMessage message) async {
+    final data = message.data;
+    final callerName = data['callerName'] ?? 'Someone';
+
+    await _flutterLocalNotificationsPlugin.show(
+      id: 0,
+      title: 'Incoming Call',
+      body: '$callerName is calling you',
+      notificationDetails: const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'calls_channel',
+          'Incoming Calls',
+          channelDescription: 'This channel is used for incoming call notifications.',
+          importance: Importance.max,
+          priority: Priority.max,
+          fullScreenIntent: true,
+          ongoing: true,
+          autoCancel: false,
+          category: AndroidNotificationCategory.call,
+        ),
+      ),
+      payload: 'call:${data['callId']}',
+    );
+  }
+
+  /// Handle local notification tap (from FlutterLocalNotificationsPlugin)
+  void _handleLocalNotificationTap(NotificationResponse response) {
+    final payload = response.payload;
+    if (payload == null || payload.isEmpty) return;
+
+    Logger.d('FCM Local notification tapped with payload: $payload');
+
+    // Handle call notification tap - payload format: "call:{callId}"
+    if (payload.startsWith('call:')) {
+      final callId = payload.substring(5); // Remove "call:" prefix
+      Logger.d('Processing call notification tap for callId: $callId');
+
+      // Emit call received event so CallController can handle it
+      // Note: We don't have full call data here, but the callId is enough
+      // The CallController should already have the call state from the socket
+      FCMService.emitCallReceived({
+        'callId': callId,
+        'callerId': '', // Will be filled by existing socket data
+        'callerName': 'Incoming Call',
+      });
+
+      // Navigate to incoming call screen
+      if (navigatorKey.currentState != null) {
+        navigatorKey.currentState!.pushNamed(RouteNames.incomingCall);
+        Logger.d('Navigated to incoming call screen from notification tap');
+      } else {
+        Logger.w('Cannot navigate: navigatorKey.currentState is null');
+      }
+    } else {
+      // Handle chat notification tap - payload is the chatId
+      final chatId = payload;
+      if (navigatorKey.currentState != null) {
+        navigatorKey.currentState!.pushNamed(
+          RouteNames.chat,
+          arguments: {
+            'chatId': chatId,
+            'chatName': null,
+            'chatAvatar': null,
+            'isOnline': false,
+          },
+        );
+        Logger.d('Navigated to chat: $chatId');
+      }
     }
   }
 
@@ -227,6 +322,13 @@ class FCMService {
           },
         );
         Logger.d('Navigated to chat: $chatId');
+      }
+    } else if (data['type'] == 'call_incoming') {
+      // Direct call incoming - emit to stream so CallController picks it up
+      FCMService.emitCallReceived(data);
+
+      if (navigatorKey.currentContext != null) {
+        Navigator.of(navigatorKey.currentContext!).pushNamed(RouteNames.incomingCall);
       }
     }
   }

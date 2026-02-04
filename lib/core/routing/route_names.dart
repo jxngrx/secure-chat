@@ -7,6 +7,7 @@ class RouteNames {
   static const String login = '/login';
   static const String register = '/register';
   static const String usernameSetup = '/username-setup';
+  static const String notificationPermission = '/notification-permission';
 
   // Contacts routes
   static const String contactSync = '/contact-sync';

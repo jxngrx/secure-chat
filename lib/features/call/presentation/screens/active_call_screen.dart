@@ -64,12 +64,42 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
       _startTimer();
     }
 
-    // Auto-close if call ended
-    if (callState.status == CallStatus.ended || callState.status == CallStatus.rejected || callState.status == CallStatus.error) {
+    // Auto-close if call ended, rejected, errored, or reset to idle
+    if (callState.status == CallStatus.ended ||
+        callState.status == CallStatus.rejected ||
+        callState.status == CallStatus.error ||
+        callState.status == CallStatus.idle) {
        WidgetsBinding.instance.addPostFrameCallback((_) {
-         if (mounted) Navigator.popUntil(context, (route) => route.isFirst || route.settings.name == '/');
+         if (mounted && Navigator.canPop(context)) {
+           // Pop back to root or first route
+           Navigator.of(context).popUntil((route) => route.isFirst);
+         }
        });
-       return const Scaffold(backgroundColor: Colors.black, body: Center(child: Text("Call Ended", style: TextStyle(color: Colors.white))));
+
+       String message = 'Call Ended';
+       if (callState.status == CallStatus.error) {
+         message = 'Connection Failed';
+       } else if (callState.status == CallStatus.rejected) {
+         message = 'Call Rejected';
+       }
+
+       return Scaffold(
+         backgroundColor: Colors.black,
+         body: Center(
+           child: Column(
+             mainAxisAlignment: MainAxisAlignment.center,
+             children: [
+               Icon(
+                 callState.status == CallStatus.error ? Icons.error_outline : Icons.call_end,
+                 color: Colors.white54,
+                 size: 64,
+               ),
+               const SizedBox(height: 16),
+               Text(message, style: const TextStyle(color: Colors.white, fontSize: 20)),
+             ],
+           ),
+         ),
+       );
     }
 
     return Scaffold(

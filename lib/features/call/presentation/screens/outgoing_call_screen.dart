@@ -73,9 +73,9 @@ class OutgoingCallScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 10),
-                const Text(
-                  'Calling...',
-                  style: TextStyle(
+                Text(
+                  callState.status == CallStatus.connecting ? 'Connecting...' : 'Calling...',
+                  style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 16,
                   ),

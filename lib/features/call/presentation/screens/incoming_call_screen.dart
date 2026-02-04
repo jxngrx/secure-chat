@@ -83,33 +83,44 @@ class IncomingCallScreen extends ConsumerWidget {
               // Call controls
               Padding(
                 padding: const EdgeInsets.only(bottom: 80, left: 50, right: 50),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Reject button
-                    _buildCallAction(
-                      icon: Icons.call_end,
-                      label: 'Decline',
-                      color: Colors.redAccent,
-                      onTap: () {
-                        controller.rejectCall();
-                        Navigator.pop(context);
-                      },
-                    ),
+                child: callState.status == CallStatus.connecting
+                    ? const Column(
+                        children: [
+                          CircularProgressIndicator(color: Colors.white),
+                          SizedBox(height: 16),
+                          Text(
+                            'Connecting...',
+                            style: TextStyle(color: Colors.white70, fontSize: 16),
+                          ),
+                        ],
+                      )
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Reject button
+                          _buildCallAction(
+                            icon: Icons.call_end,
+                            label: 'Decline',
+                            color: Colors.redAccent,
+                            onTap: () {
+                              controller.rejectCall();
+                              Navigator.pop(context);
+                            },
+                          ),
 
-                    // Answer button
-                    _buildCallAction(
-                      icon: Icons.call,
-                      label: 'Accept',
-                      color: const Color(0xFF2E7D32),
-                      onTap: () {
-                        controller.answerCall();
-                        // Navigation is handled by CallGlobalListener or manually here
-                        // navigatorKey is already pushing ActiveCall on status == connected
-                      },
-                    ),
-                  ],
-                ),
+                          // Answer button
+                          _buildCallAction(
+                            icon: Icons.call,
+                            label: 'Accept',
+                            color: const Color(0xFF2E7D32),
+                            onTap: () {
+                              controller.answerCall();
+                              // Navigate immediately to ActiveCallScreen for premium UI
+                              Navigator.pushReplacementNamed(context, RouteNames.activeCall);
+                            },
+                          ),
+                        ],
+                      ),
               ),
             ],
           ),

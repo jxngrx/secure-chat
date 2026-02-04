@@ -938,7 +938,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
           ),
 
-          /*
           // Call button
           if (!(ref.watch(chatControllerProvider).chats.any((c) => c.id == widget.chatId && c.isGroup)))
             IconButton(
@@ -961,7 +960,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               size: 24,
             ),
           ),
-          */
 
           // Edit button (menu with delete option)
           PopupMenuButton<String>(
