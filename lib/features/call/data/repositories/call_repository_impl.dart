@@ -5,8 +5,12 @@ import '../datasources/call_remote_ds.dart';
 import '../datasources/call_socket_ds.dart';
 
 class CallRepositoryImpl implements CallRepository {
-  CallRepositoryImpl._();
-  static final CallRepositoryImpl instance = CallRepositoryImpl._();
+  // FIXED: Use a factory constructor so the singleton ALSO calls _initSocketListeners
+  static CallRepositoryImpl? _instance;
+  static CallRepositoryImpl get instance {
+    _instance ??= CallRepositoryImpl._internal();
+    return _instance!;
+  }
 
   final CallRemoteDataSource _remoteDS = CallRemoteDataSource.instance;
   final CallSocketDataSource _socketDS = CallSocketDataSource.instance;
@@ -23,7 +27,8 @@ class CallRepositoryImpl implements CallRepository {
   final _webRTCAnswerController = StreamController<dynamic>.broadcast();
   final _webRTCIceCandidateController = StreamController<dynamic>.broadcast();
 
-  CallRepositoryImpl() {
+  // FIXED: Private named constructor that ALWAYS calls _initSocketListeners
+  CallRepositoryImpl._internal() {
     _initSocketListeners();
   }
 

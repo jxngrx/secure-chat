@@ -8,6 +8,7 @@ import '../storage/secure_storage.dart';
 import '../constants/storage_keys.dart';
 import '../../core/routing/route_names.dart';
 import '../../app.dart' show navigatorKey;
+import 'callkit_service.dart';
 
 /// Top-level function to handle background messages
 /// Must be a top-level function (not a class method)
@@ -20,10 +21,22 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     // Notify about incoming call via static stream
     FCMService.emitCallReceived(message.data);
 
-    // For background calls, we show a high-priority notification with full-screen intent
-    await FCMService.instance.showCallNotification(message);
+    // Show native incoming call UI via CallKit
+    // We use the singleton instance which is safe here as it doesn't depend on complex app state
+    final data = message.data;
+    await CallKitService.instance.showIncomingCall(
+      callId: data['callId'],
+      callerName: data['callerName'] ?? 'Unknown Caller',
+      callerId: data['callerId'] ?? 'unknown',
+      avatar: data['callerAvatar'],
+      hasVideo: data['isVideo'] == 'true',
+    );
   }
 }
+
+// We need to move this logic effectively.
+// Let's update `FCMService` class first.
+
 
 class FCMService {
   FCMService._();
@@ -68,6 +81,8 @@ class FCMService {
         'High Importance Notifications', // title
         description: 'This channel is used for important notifications.', // description
         importance: Importance.max,
+        enableLights: true,
+        ledColor: Colors.blue,
       );
 
       // Create Dedicated Call Channel for Android
@@ -78,6 +93,8 @@ class FCMService {
         importance: Importance.max,
         playSound: true,
         enableVibration: true,
+        enableLights: true,
+        ledColor: Colors.green,
       );
 
       final androidPlugin = _flutterLocalNotificationsPlugin
@@ -104,6 +121,9 @@ class FCMService {
         // Get the token
         _currentFcmToken = await _firebaseMessaging.getToken();
         Logger.d('FCM Token: $_currentFcmToken');
+
+        // Sync immediately if we can
+        syncTokenWithBackend();
 
         _setupForegroundMessageHandler();
         _setupOnTokenRefresh();
@@ -142,28 +162,41 @@ class FCMService {
   }
 
   /// Sync FCM token with backend
-  Future<void> syncTokenWithBackend() async {
-    _currentFcmToken ??= await _firebaseMessaging.getToken();
+  Future<String> syncTokenWithBackend() async {
+    Logger.d('FCMService: syncTokenWithBackend called');
+    try {
+      _currentFcmToken ??= await _firebaseMessaging.getToken();
+      Logger.d('FCMService: Retrieved token: $_currentFcmToken');
+    } catch (e) {
+      Logger.e('FCMService: Error getting FCM token', e);
+      return 'Error retrieving token: $e';
+    }
 
     if (_currentFcmToken == null) {
-      Logger.w('Cannot sync FCM token: token is null');
-      return;
+      Logger.w('FCMService: Cannot sync FCM token: token is null');
+      return 'Token is NULL';
     }
 
     try {
       // Check if user is authenticated before syncing
       final secureStorage = SecureStorage.instance;
       final token = await secureStorage.read(StorageKeys.authToken);
+      Logger.d('FCMService: Auth Check - Token present: ${token != null && token.isNotEmpty}');
 
       if (token != null && token.isNotEmpty) {
-        Logger.d('Syncing FCM token with backend...');
+        Logger.d('FCMService: Syncing FCM token with backend...');
+        final start = DateTime.now();
         await _apiClient.put('/devices/fcm-token', {'fcmToken': _currentFcmToken});
-        Logger.d('FCM token synced successfully');
+        final end = DateTime.now();
+        Logger.d('FCMService: FCM token synced successfully in ${end.difference(start).inMilliseconds}ms');
+        return 'Success: Synced in ${end.difference(start).inMilliseconds}ms';
       } else {
-        Logger.d('Skipping FCM token sync: user not authenticated');
+        Logger.d('FCMService: Skipping FCM token sync: user not authenticated');
+        return 'Skipped: Not Authenticated';
       }
     } catch (e) {
-      Logger.e('Error syncing FCM token with backend', e);
+      Logger.e('FCMService: Error syncing FCM token with backend', e);
+      return 'Sync Error: $e';
     }
   }
 
@@ -236,24 +269,13 @@ class FCMService {
     final data = message.data;
     final callerName = data['callerName'] ?? 'Someone';
 
-    await _flutterLocalNotificationsPlugin.show(
-      id: 0,
-      title: 'Incoming Call',
-      body: '$callerName is calling you',
-      notificationDetails: const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'calls_channel',
-          'Incoming Calls',
-          channelDescription: 'This channel is used for incoming call notifications.',
-          importance: Importance.max,
-          priority: Priority.max,
-          fullScreenIntent: true,
-          ongoing: true,
-          autoCancel: false,
-          category: AndroidNotificationCategory.call,
-        ),
-      ),
-      payload: 'call:${data['callId']}',
+    // Use CallKit for standard incoming call experience
+    await CallKitService.instance.showIncomingCall(
+      callId: data['callId'],
+      callerName: callerName,
+      callerId: data['callerId'] ?? 'unknown',
+      avatar: data['callerAvatar'],
+      hasVideo: data['isVideo'] == 'true',
     );
   }
 

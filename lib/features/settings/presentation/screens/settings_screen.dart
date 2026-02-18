@@ -11,6 +11,7 @@ import '../../../../core/utils/logger.dart';
 import '../../../../core/utils/avatar_utils.dart';
 import '../../../../di/injection_container.dart';
 import '../../../user/data/models/user_model.dart';
+import '../../../../core/services/fcm_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
@@ -545,6 +546,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _buildDevicesSection(isDark, surfaceColor),
                   ],
                   const SizedBox(height: 24),
+
+                  // Sync Token Button (Debug)
+                  _buildActionButton(
+                    isDark: isDark,
+                    surfaceColor: surfaceColor,
+                    icon: Icons.sync,
+                    title: 'Sync Notification Token',
+                    color: Colors.blue,
+                    onTap: () async {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Syncing token...')),
+                      );
+                      final result = await FCMService.instance.syncTokenWithBackend();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(result),
+                            backgroundColor: result.startsWith('Success') ? Colors.green : Colors.red,
+                            duration: const Duration(seconds: 5),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
 
                   // Log Out Button
                   _buildActionButton(

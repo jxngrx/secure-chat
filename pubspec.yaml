@@ -76,6 +76,7 @@ dependencies:
   cached_network_image: ^3.4.1
   any_link_preview: ^3.0.3
   agora_rtc_engine: ^6.5.3
+  flutter_callkit_incoming: ^2.0.0
 
 dev_dependencies:
   flutter_test:

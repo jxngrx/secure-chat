@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../presentation/notifiers/call_controller.dart';
-import '../../../../core/routing/route_names.dart';
-
 
 class IncomingCallScreen extends ConsumerWidget {
   const IncomingCallScreen({super.key});
@@ -13,10 +11,13 @@ class IncomingCallScreen extends ConsumerWidget {
     final controller = ref.read(callControllerProvider.notifier);
     final call = controller.currentCall;
 
-    // Auto-dismiss if call ended or not ringing (but don't pop if we are connecting/connected as GlobalListener handles that)
-    if (call == null || (callState.status != CallStatus.ringing &&
-        callState.status != CallStatus.connecting &&
-        callState.status != CallStatus.connected)) {
+    // Auto-dismiss on terminal states
+    // Do NOT dismiss on connecting/connected - CallGlobalListener handles navigation
+    if (call == null ||
+        callState.status == CallStatus.ended ||
+        callState.status == CallStatus.rejected ||
+        callState.status == CallStatus.error ||
+        callState.status == CallStatus.idle) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted && Navigator.canPop(context)) {
           Navigator.pop(context);
@@ -57,7 +58,8 @@ class IncomingCallScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    call.callerName ?? 'User ${call.callerId.substring(call.callerId.length > 5 ? call.callerId.length - 5 : 0)}',
+                    call.callerName ??
+                        'User ${call.callerId.length > 5 ? call.callerId.substring(call.callerId.length - 5) : call.callerId}',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 32,
@@ -97,26 +99,25 @@ class IncomingCallScreen extends ConsumerWidget {
                     : Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // Reject button
+                          // Decline button
                           _buildCallAction(
                             icon: Icons.call_end,
                             label: 'Decline',
                             color: Colors.redAccent,
-                            onTap: () {
-                              controller.rejectCall();
-                              Navigator.pop(context);
+                            onTap: () async {
+                              await controller.rejectCall();
+                              // Pop handled by CallGlobalListener
                             },
                           ),
 
-                          // Answer button
+                          // Accept button
                           _buildCallAction(
                             icon: Icons.call,
                             label: 'Accept',
                             color: const Color(0xFF2E7D32),
-                            onTap: () {
-                              controller.answerCall();
-                              // Navigate immediately to ActiveCallScreen for premium UI
-                              Navigator.pushReplacementNamed(context, RouteNames.activeCall);
+                            onTap: () async {
+                              await controller.answerCall();
+                              // Navigation to ActiveCallScreen handled by CallGlobalListener
                             },
                           ),
                         ],

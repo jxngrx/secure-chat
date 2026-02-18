@@ -12,27 +12,49 @@ class CallGlobalListener extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.listen<CallState>(callControllerProvider, (previous, next) {
-      if (next.status == CallStatus.ringing) {
-        // CRITICAL: Only show incoming call screen if we're NOT the caller
-        // Check both the isCaller flag and previous state to be safe
+      final prevStatus = previous?.status;
+      final nextStatus = next.status;
+
+      // --- Incoming Call (Receiver) ---
+      if (nextStatus == CallStatus.ringing) {
         final controller = ref.read(callControllerProvider.notifier);
-        final wasInitiating = previous?.status == CallStatus.initiating;
         final isCaller = controller.isCaller;
 
-        // Don't show incoming call screen if:
-        // 1. We're marked as the caller
-        // 2. Previous status was initiating (we were calling)
-        if (!isCaller && !wasInitiating) {
-          // Use pushNamed to match FCMService and allow for easier route tracking
-          // Note: MaterialPageRoute is fine, but pushNamed is more consistent
+        // Only show incoming call screen for the receiver
+        if (!isCaller) {
           navigatorKey.currentState?.pushNamed(RouteNames.incomingCall);
         }
-      } else if (next.status == CallStatus.connecting || next.status == CallStatus.connected) {
-         // Auto-transition to ActiveCallScreen when connecting/connected
-         // This ensures user sees premium UI during WebRTC setup, not the basic incoming call screen
-         if (previous?.status != CallStatus.connecting && previous?.status != CallStatus.connected) {
-           navigatorKey.currentState?.pushReplacementNamed(RouteNames.activeCall);
-         }
+      }
+
+      // --- Call Connecting / Connected (Both Caller & Receiver) ---
+      // Trigger when:
+      // - Caller: initiating/ringing → connecting (callee answered)
+      // - Receiver: ringing/connecting → connected (Agora joined)
+      else if (nextStatus == CallStatus.connecting || nextStatus == CallStatus.connected) {
+        final wasAlreadyInCall = prevStatus == CallStatus.connecting ||
+            prevStatus == CallStatus.connected;
+
+        if (!wasAlreadyInCall) {
+          // Navigate to active call screen for both caller and receiver
+          navigatorKey.currentState?.pushReplacementNamed(RouteNames.activeCall);
+        }
+      }
+
+      // --- Call Ended / Rejected (Both Sides) ---
+      // Pop back to root if we're on a call screen
+      else if (nextStatus == CallStatus.ended ||
+          nextStatus == CallStatus.rejected ||
+          nextStatus == CallStatus.error) {
+        // Only navigate away if we were in a call state
+        final wasInCall = prevStatus == CallStatus.ringing ||
+            prevStatus == CallStatus.connecting ||
+            prevStatus == CallStatus.connected ||
+            prevStatus == CallStatus.initiating;
+
+        if (wasInCall) {
+          // Pop all call screens back to root
+          navigatorKey.currentState?.popUntil((route) => route.isFirst);
+        }
       }
     });
 
