@@ -28,7 +28,7 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  int _selectedTab = 1; // 0: Chats, 1: Settings
+  int _selectedTab = 2; // 0: Calls, 1: Chats, 2: Settings
   bool _isLoading = true;
   bool _isLoadingDevices = false;
   bool _isLoadingSessions = false;
@@ -308,10 +308,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
 
     switch (index) {
-      case 0: // Chats
+      case 0: // Calls
+        Navigator.pushReplacementNamed(context, RouteNames.calls);
+        break;
+      case 1: // Chats
         Navigator.pushReplacementNamed(context, RouteNames.chatList);
         break;
-      case 1: // Settings
+      case 2: // Settings
         // Already on settings, do nothing
         break;
     }
@@ -891,13 +894,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ],
                   ],
                 ),
+
               ),
-              if (hasActiveSession && sessionId != null)
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.red),
-                  onPressed: () => _handleDeleteSession(sessionId, deviceModel),
-                  tooltip: 'Delete session',
-                ),
             ],
           ),
           if (hasActiveSession) ...[
@@ -990,8 +988,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildNavItem(Icons.chat_bubble, 'Chats', 0, isDark),
-          _buildNavItem(Icons.settings, 'Settings', 1, isDark),
+          _buildNavItem(Icons.call, 'Calls', 0, isDark),
+          _buildNavItem(Icons.chat_bubble, 'Chats', 1, isDark),
+          _buildNavItem(Icons.settings, 'Settings', 2, isDark),
         ],
       ),
     );

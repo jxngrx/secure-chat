@@ -173,29 +173,66 @@ class CallController extends StateNotifier<CallState> {
   // ─── CallKit Listeners ───────────────────────────────────────────────────────
 
   void _setupCallKitListeners() {
-    _subscriptions.add(CallKitService.instance.onCallEvent.listen((event) async {
-      Logger.d('CallController: CallKit event: ${event.event}');
-      switch (event.event) {
-        case Event.actionCallAccept:
-          Logger.d('CallController: CallKit accept → opening IncomingCallScreen');
-          navigatorKey.currentState?.pushNamed(RouteNames.incomingCall);
-          break;
-        case Event.actionCallDecline:
-          Logger.d('CallController: CallKit decline → rejecting call');
-          await rejectCall();
-          break;
-        case Event.actionCallEnded:
-          Logger.d('CallController: CallKit ended');
-          await endCall();
-          break;
-        case Event.actionCallTimeout:
-          Logger.d('CallController: CallKit timeout');
-          await endCall();
-          break;
-        default:
-          break;
-      }
-    }));
+    _subscriptions.add(CallKitService.instance.onCallEvent.listen(_handleCallKitEvent));
+
+    // Check for any cached events (e.g. app launched from background)
+    final lastEvent = CallKitService.instance.lastEvent;
+    if (lastEvent != null) {
+      Logger.d('CallController: Handling cached CallKit event: ${lastEvent.event}');
+      _handleCallKitEvent(lastEvent);
+    }
+  }
+
+  Future<void> _handleCallKitEvent(CallEvent event) async {
+    Logger.d('CallController: CallKit event: ${event.event}');
+    switch (event.event) {
+      case Event.actionCallAccept:
+        Logger.d('CallController: CallKit accept → answering call');
+        // If we are not in a call state yet (app was killed), we must reconstruct the call from event data
+        final body = event.body as Map<dynamic, dynamic>;
+        final extra = body['extra'] as Map<dynamic, dynamic>? ?? {};
+        final callId = extra['callId'] as String?;
+        final callerId = extra['userId'] as String?; // We mapped callerId to userId in CallKitService
+
+        if (state.currentCall == null && callId != null) {
+            Logger.d('CallController: Reconstructing call from CallKit event: $callId');
+            final call = CallEntity(
+              id: callId,
+              callerId: callerId ?? 'unknown',
+              callerName: body['nameCaller'] as String? ?? 'Incoming Call',
+              receiverId: _currentUserId ?? '',
+              status: 'ringing',
+              startTime: DateTime.now(),
+            );
+            state = state.copyWith(currentCall: call, isCaller: false);
+        }
+
+        if (state.currentCall != null) {
+           answerCall();
+        } else {
+           // Fallback if data is missing, though this shouldn't happen if payload is correct
+           navigatorKey.currentState?.pushNamed(RouteNames.incomingCall);
+        }
+        break;
+      case Event.actionCallDecline:
+        Logger.d('CallController: CallKit decline → rejecting call');
+        await rejectCall();
+        break;
+      case Event.actionCallIncoming:
+        Logger.d('CallController: CallKit Incoming event received');
+        // This might be triggered when we show the call via CallKit
+        break;
+      case Event.actionCallEnded:
+        Logger.d('CallController: CallKit ended');
+        await endCall();
+        break;
+      case Event.actionCallTimeout:
+        Logger.d('CallController: CallKit timeout');
+        await endCall();
+        break;
+      default:
+        break;
+    }
   }
 
   // ─── Actions ─────────────────────────────────────────────────────────────────

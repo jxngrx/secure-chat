@@ -14,6 +14,9 @@ import 'callkit_service.dart';
 /// Must be a top-level function (not a class method)
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // Ensure Flutter binding is initialized for platform channels
+  WidgetsFlutterBinding.ensureInitialized();
+
   Logger.d('FCM Background message received: ${message.messageId}');
   Logger.d('FCM Background message data: ${message.data}');
 
@@ -24,8 +27,14 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     // Show native incoming call UI via CallKit
     // We use the singleton instance which is safe here as it doesn't depend on complex app state
     final data = message.data;
+    final callId = data['callId'];
+    if (callId == null) {
+      Logger.e('FCM Background: callId is null, cannot show call UI');
+      return;
+    }
+
     await CallKitService.instance.showIncomingCall(
-      callId: data['callId'],
+      callId: callId,
       callerName: data['callerName'] ?? 'Unknown Caller',
       callerId: data['callerId'] ?? 'unknown',
       avatar: data['callerAvatar'],
@@ -307,10 +316,25 @@ class FCMService {
       } else {
         Logger.w('Cannot navigate: navigatorKey.currentState is null');
       }
-    } else {
-      // Handle chat notification tap - payload is the chatId
-      final chatId = payload;
+    } else if (payload.startsWith('chat:')) {
+      // Handle chat notification tap - payload format: "chat:{chatId}"
+      final chatId = payload.substring(5);
       if (navigatorKey.currentState != null) {
+        navigatorKey.currentState!.pushNamed(
+          RouteNames.chat,
+          arguments: {
+            'chatId': chatId,
+            'chatName': null, // Will be loaded by chat screen
+            'chatAvatar': null,
+            'isOnline': false,
+          },
+        );
+        Logger.d('Navigated to chat: $chatId');
+      }
+    } else {
+       // Legacy payload support (direct chatId)
+       final chatId = payload;
+       if (navigatorKey.currentState != null) {
         navigatorKey.currentState!.pushNamed(
           RouteNames.chat,
           arguments: {
@@ -320,7 +344,7 @@ class FCMService {
             'isOnline': false,
           },
         );
-        Logger.d('Navigated to chat: $chatId');
+        Logger.d('Navigated to chat (legacy): $chatId');
       }
     }
   }

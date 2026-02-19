@@ -232,12 +232,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     try {
       // Update username if changed
-      if (username != currentUsername) {
-        await _apiService.updateUsername(username);
+      Map<String, dynamic>? updatedUser;
 
-        // Update local storage
-        final updatedProfile = await _apiService.getProfile();
-        final userModel = UserModel.fromJson(updatedProfile);
+      if (username != currentUsername) {
+        final response = await _apiService.updateUsername(username);
+        updatedUser = response['data'] != null ? response['data'] as Map<String, dynamic> : response;
+
+        // Update local storage directly with the response
+        final userModel = UserModel.fromJson(updatedUser);
         await _localStorage.write(
           StorageKeys.userProfile,
           jsonEncode(userModel.toJson()),
@@ -247,18 +249,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       // Update phone if changed
       final phone = _phoneController.text.trim();
       final currentPhone = _userProfile?['phone'] as String? ?? '';
-      if (phone.isNotEmpty && phone != currentPhone) {
-        await _apiService.updatePhone(phone);
 
-        // Refresh local storage again if needed, or if username wasn't changed
-        if (username == currentUsername) {
-          final updatedProfile = await _apiService.getProfile();
-          final userModel = UserModel.fromJson(updatedProfile);
-          await _localStorage.write(
-            StorageKeys.userProfile,
-            jsonEncode(userModel.toJson()),
-          );
-        }
+      if (phone.isNotEmpty && phone != currentPhone) {
+        final response = await _apiService.updatePhone(phone);
+        updatedUser = response['data'] != null ? response['data'] as Map<String, dynamic> : response;
+
+        // Update local storage
+        final userModel = UserModel.fromJson(updatedUser);
+        await _localStorage.write(
+          StorageKeys.userProfile,
+          jsonEncode(userModel.toJson()),
+        );
       }
 
       // TODO: Upload avatar if image selected

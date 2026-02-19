@@ -5,6 +5,7 @@ import '../../presentation/notifiers/call_controller.dart';
 import '../../../../core/services/webrtc_service.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/routing/route_names.dart';
 
 class ActiveCallScreen extends ConsumerStatefulWidget {
   const ActiveCallScreen({super.key});
@@ -70,9 +71,12 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
         callState.status == CallStatus.error ||
         callState.status == CallStatus.idle) {
        WidgetsBinding.instance.addPostFrameCallback((_) {
-         if (mounted && Navigator.canPop(context)) {
-           // Pop back to root or first route
-           Navigator.of(context).popUntil((route) => route.isFirst);
+         if (mounted) {
+           if (Navigator.canPop(context)) {
+             Navigator.pop(context);
+           } else {
+             Navigator.pushReplacementNamed(context, RouteNames.chatList);
+           }
          }
        });
 

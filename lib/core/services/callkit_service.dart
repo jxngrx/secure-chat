@@ -11,10 +11,20 @@ class CallKitService {
   final _callEventController = StreamController<CallEvent>.broadcast();
   Stream<CallEvent> get onCallEvent => _callEventController.stream;
 
+  CallEvent? _lastEvent;
+  CallEvent? get lastEvent => _lastEvent;
+
   Future<void> initialize() async {
+    // Request permissions for Android 13+ and CallKit
+    await FlutterCallkitIncoming.requestNotificationPermission({
+      "rationaleMessage_permission_phone": "Phone permission is required to show call UI.",
+      "rationaleMessage_permission_notification": "Notification permission is required to show outgoing call UI."
+    });
+
     FlutterCallkitIncoming.onEvent.listen((event) {
       if (event != null) {
         Logger.d('CallKit Event: ${event.event} - Body: ${event.body}');
+        _lastEvent = event;
         _callEventController.add(event);
       }
     });
@@ -48,16 +58,17 @@ class CallKitService {
       extra: <String, dynamic>{'userId': callerId, 'callId': callId},
       headers: <String, dynamic>{'platform': 'flutter'},
       android: const AndroidParams(
-        // isCustomNotification: false means it uses the full-screen call UI
-        // which opens the app when tapped
         isCustomNotification: false,
-        isShowLogo: false,
-        ringtonePath: 'system_ringtone_default',
+        isShowLogo: true,
+        ringtonePath: 'default',
         backgroundColor: '#0F0F1A',
         backgroundUrl: '',
         actionColor: '#4CAF50',
-        // This is the key: when user taps the notification, it opens the app
-        isShowCallID: false,
+        isShowCallID: true,
+        incomingCallNotificationChannelName: 'Incoming Calls',
+        missedCallNotificationChannelName: 'Missed Calls',
+        isShowFullLockedScreen: true,
+        isImportant: true,
       ),
       ios: const IOSParams(
         iconName: 'CallKitLogo',

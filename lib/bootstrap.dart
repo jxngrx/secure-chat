@@ -9,6 +9,7 @@ import 'core/config/flavor.dart';
 import 'core/constants/storage_keys.dart';
 import 'core/services/background_service_manager.dart';
 import 'core/services/fcm_service.dart';
+import 'core/services/callkit_service.dart';
 import 'core/storage/secure_storage.dart';
 import 'core/utils/logger.dart';
 import 'di/injection_container.dart';
@@ -47,6 +48,14 @@ Future<void> bootstrap() async {
   } catch (e) {
     Logger.e('Error initializing FCM service', e);
     // Continue - FCM will retry later
+  }
+
+  // Initialize CallKitService
+  try {
+    await CallKitService.instance.initialize();
+    Logger.d('CallKitService initialized');
+  } catch (e) {
+    Logger.e('Error initializing CallKitService', e);
   }
 
   // Initialize Workmanager

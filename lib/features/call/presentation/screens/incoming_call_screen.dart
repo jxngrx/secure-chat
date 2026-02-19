@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../presentation/notifiers/call_controller.dart';
+import '../../../../core/routing/route_names.dart';
 
 class IncomingCallScreen extends ConsumerWidget {
   const IncomingCallScreen({super.key});
@@ -19,8 +20,12 @@ class IncomingCallScreen extends ConsumerWidget {
         callState.status == CallStatus.error ||
         callState.status == CallStatus.idle) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted && Navigator.canPop(context)) {
-          Navigator.pop(context);
+        if (context.mounted) {
+          if (Navigator.canPop(context)) {
+            Navigator.pop(context);
+          } else {
+             Navigator.pushReplacementNamed(context, RouteNames.chatList);
+          }
         }
       });
       return const Scaffold(backgroundColor: Colors.black);

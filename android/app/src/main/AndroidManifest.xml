@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!-- Location permissions -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -24,6 +25,9 @@
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
@@ -64,6 +68,36 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="chat_messages" />
+
+        <!-- CallKit Incoming Services & Receivers -->
+        <service android:name="com.hiennv.flutter_callkit_incoming.CallkitIncomingService"
+            android:foregroundServiceType="shortService"
+            android:exported="false">
+        </service>
+        <receiver android:name="com.hiennv.flutter_callkit_incoming.CallkitIncomingBroadcastReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.hiennv.flutter_callkit_incoming.ACTION_CALL_INCOMING"/>
+                <action android:name="com.hiennv.flutter_callkit_incoming.ACTION_CALL_START"/>
+                <action android:name="com.hiennv.flutter_callkit_incoming.ACTION_CALL_ACCEPT"/>
+                <action android:name="com.hiennv.flutter_callkit_incoming.ACTION_CALL_DECLINE"/>
+                <action android:name="com.hiennv.flutter_callkit_incoming.ACTION_CALL_ENDED"/>
+                <action android:name="com.hiennv.flutter_callkit_incoming.ACTION_CALL_TIMEOUT"/>
+                <action android:name="com.hiennv.flutter_callkit_incoming.ACTION_CALL_CALLBACK"/>
+            </intent-filter>
+        </receiver>
+
+        <activity android:name="com.hiennv.flutter_callkit_incoming.CallkitIncomingActivity"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar"
+            android:launchMode="singleInstance"
+            android:taskAffinity="com.hiennv.flutter_callkit_incoming.INCOMING_CALL_AFFINITY"
+            android:excludeFromRecents="true"
+            android:autoRemoveFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:exported="true"
+            tools:replace="android:exported,android:launchMode,android:taskAffinity,android:theme">
+        </activity>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
