@@ -46,10 +46,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void initState() {
     super.initState();
     _loadProfile();
-    _usernameController.addListener(() {
-      _onUsernameChanged();
-      setState(() {}); // Update avatar when username changes
-    });
+    // _usernameController.addListener(() {
+    //   _onUsernameChanged();
+    //   setState(() {}); // Update avatar when username changes
+    // });
   }
 
   @override
@@ -507,11 +507,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 child: TextField(
                   controller: _usernameController,
                   focusNode: _usernameFocusNode,
-                  enabled: !_isLoading,
+                  enabled: false, // Username is not editable
                   style: TextStyle(
                     fontSize: 18,
                     fontFamily: 'monospace',
-                    color: isDark ? Colors.white : Colors.black87,
+                    color: isDark ? Colors.white70 : Colors.black54, // Dim text color
                   ),
                   decoration: InputDecoration(
                     hintText: 'username',
@@ -523,25 +523,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       horizontal: 8,
                       vertical: 16,
                     ),
-                    suffixIcon: _isCheckingUsername
-                        ? const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          )
-                        : _isUsernameAvailable
-                            ? const Padding(
-                                padding: EdgeInsets.all(12),
-                                child: Icon(
-                                  Icons.check_circle,
-                                  color: Color(0xFF4CAF50),
-                                  size: 20,
-                                ),
-                              )
-                            : null,
+                    suffixIcon: const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Icon(
+                        Icons.lock,
+                        color: Colors.grey,
+                        size: 20,
+                      ),
+                    ),
                   ),
                 ),
               ),
