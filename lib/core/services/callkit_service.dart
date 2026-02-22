@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../utils/logger.dart';
 
 class CallKitService {
@@ -20,6 +21,22 @@ class CallKitService {
       "rationaleMessage_permission_phone": "Phone permission is required to show call UI.",
       "rationaleMessage_permission_notification": "Notification permission is required to show outgoing call UI."
     });
+
+    try {
+      // Android 10+ Background Activity Restrictions
+      // We must explicitly request "Display Over Other Apps" (SYSTEM_ALERT_WINDOW)
+      // Otherwise the CallKit Activity cannot be launched from the FCM background isolate
+      if (await Permission.systemAlertWindow.isDenied) {
+        await Permission.systemAlertWindow.request();
+      }
+
+      // Request ignoring battery optimizations which prevents the OS from suspending the FCM service
+      if (await Permission.ignoreBatteryOptimizations.isDenied) {
+        await Permission.ignoreBatteryOptimizations.request();
+      }
+    } catch (e) {
+      Logger.w('CallKitService: Could not request background execution permissions: $e');
+    }
 
     FlutterCallkitIncoming.onEvent.listen((event) {
       if (event != null) {
@@ -58,9 +75,9 @@ class CallKitService {
       extra: <String, dynamic>{'userId': callerId, 'callId': callId},
       headers: <String, dynamic>{'platform': 'flutter'},
       android: const AndroidParams(
-        isCustomNotification: false,
+        isCustomNotification: true, // Use custom UI to ensure it pops up over lock screen
         isShowLogo: true,
-        ringtonePath: 'default',
+        ringtonePath: 'system_ringtone_default',
         backgroundColor: '#0F0F1A',
         backgroundUrl: '',
         actionColor: '#4CAF50',

@@ -8,6 +8,7 @@ import '../storage/secure_storage.dart';
 import '../constants/storage_keys.dart';
 import '../../core/routing/route_names.dart';
 import '../../app.dart' show navigatorKey;
+import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'callkit_service.dart';
 
 /// Top-level function to handle background messages
@@ -140,7 +141,12 @@ class FCMService {
         // Listen for when the app is opened from a notification when terminated
         final initialMessage = await _firebaseMessaging.getInitialMessage();
         if (initialMessage != null) {
-          _handleNotificationTap(initialMessage);
+          // Add a short delay to allow CallKit caching to finish first.
+          // Because CallKit is native, it's very fast, but if it started the app,
+          // we must let CallKit set its lastEvent before FCM tries to route it.
+          Future.delayed(const Duration(milliseconds: 500), () {
+            _handleNotificationTap(initialMessage);
+          });
         }
 
         // Listen for when the app is opened from a notification when in background
@@ -309,12 +315,17 @@ class FCMService {
         'callerName': 'Incoming Call',
       });
 
-      // Navigate to incoming call screen
-      if (navigatorKey.currentState != null) {
+      // Navigate to incoming call screen ONLY IF CallKit isn't actively doing it!
+      // If CallKit has an active event (like user just accepted), we don't need this Flutter UI duplicate
+      final lastEvent = CallKitService.instance.lastEvent;
+      final shouldShowFlutterUI = lastEvent?.event != Event.actionCallAccept &&
+                                  lastEvent?.event != Event.actionCallDecline;
+
+      if (shouldShowFlutterUI && navigatorKey.currentState != null) {
         navigatorKey.currentState!.pushNamed(RouteNames.incomingCall);
         Logger.d('Navigated to incoming call screen from notification tap');
       } else {
-        Logger.w('Cannot navigate: navigatorKey.currentState is null');
+        Logger.w('Skipping Flutter IncomingCall routing, CallKit already handling it.');
       }
     } else if (payload.startsWith('chat:')) {
       // Handle chat notification tap - payload format: "chat:{chatId}"
@@ -373,8 +384,17 @@ class FCMService {
       // Direct call incoming - emit to stream so CallController picks it up
       FCMService.emitCallReceived(data);
 
-      if (navigatorKey.currentContext != null) {
+      // Same logic as local notifications: only show Flutter UI if CallKit isn't actively handling the intent
+      final lastEvent = CallKitService.instance.lastEvent;
+      final shouldShowFlutterUI = lastEvent?.event != Event.actionCallAccept &&
+                                  lastEvent?.event != Event.actionCallDecline &&
+                                  lastEvent?.event != Event.actionCallStart;
+
+      if (shouldShowFlutterUI && navigatorKey.currentContext != null) {
         Navigator.of(navigatorKey.currentContext!).pushNamed(RouteNames.incomingCall);
+        Logger.d('FCMService: Opened Flutter Incoming Call UI');
+      } else {
+         Logger.d('FCMService: Ignored Opening Flutter UI because CallKit natively handled it (${lastEvent?.event})');
       }
     }
   }

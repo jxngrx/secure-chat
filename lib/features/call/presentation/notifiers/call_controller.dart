@@ -208,6 +208,14 @@ class CallController extends StateNotifier<CallState> {
         }
 
         if (state.currentCall != null) {
+          // If the socket isn't connected yet (Cold Start),
+          // we wait up to 3 seconds for it to hydrate so answer() works over socket.
+          // In an ideal world, we could just fall back to REST straight away, but the repository relies on Socket emit.
+          if (_currentUserId == null) {
+             Logger.d('CallController: Missing Current User ID on cold accept. Waiting for Auth...');
+             await Future.delayed(const Duration(milliseconds: 1500));
+             await _loadCurrentUserId(); // re-attempt load
+          }
            answerCall();
         } else {
            // Fallback if data is missing, though this shouldn't happen if payload is correct
@@ -220,7 +228,7 @@ class CallController extends StateNotifier<CallState> {
         break;
       case Event.actionCallIncoming:
         Logger.d('CallController: CallKit Incoming event received');
-        // This might be triggered when we show the call via CallKit
+        // Let Native CallKit handle the UI rendering. Do not aggressively re-show here.
         break;
       case Event.actionCallEnded:
         Logger.d('CallController: CallKit ended');
@@ -322,7 +330,8 @@ class CallController extends StateNotifier<CallState> {
     try {
       Logger.d('CallController: Answering call ${state.currentCall!.id}');
       await _stopRingtone();
-      await CallKitService.instance.endAllCalls();
+      // DO NOT call CallKitService.instance.endAllCalls() here, otherwise it triggers actionCallEnded
+      // which immediately hangs up the call! CallKit implicitly goes to active state when answered.
 
       state = state.copyWith(status: CallStatus.connecting);
       await _repository.answerCall(state.currentCall!.id);
@@ -427,8 +436,15 @@ class CallController extends StateNotifier<CallState> {
       currentCall: call,
       isCaller: false,
     );
-    _agoraJoined = false;
-    await _playRingtone('incoming');
+    // We only play the FlutterRingtone fallback if the CallKit Native UI isn't expected to handle it.
+    // CallKit will play the system_ringtone_default directly.
+    // If the device is iOS or CallKit triggers correctly, playing both causes echo/crashes.
+    final lastEvent = CallKitService.instance.lastEvent?.event;
+    if (lastEvent != Event.actionCallIncoming && lastEvent != Event.actionCallStart) {
+       await _playRingtone('incoming');
+    } else {
+       Logger.d('CallController: Skipped _playRingtone, Native CallKit UI is handling audio.');
+    }
   }
 
   void _handleCallInitiated(dynamic data) {
@@ -486,6 +502,13 @@ class CallController extends StateNotifier<CallState> {
 
     if (!state.isCaller) return;
 
+    if (data['agora'] != null) {
+      _agoraToken = data['agora']['token'];
+      _agoraChannelId = data['agora']['channel'];
+      _agoraUid = data['agora']['uid'];
+      Logger.d('CallController: Caller Agora config updated from call:answered');
+    }
+
     _stopRingtone();
     state = state.copyWith(status: CallStatus.connecting);
     _joinAgoraChannel();
@@ -494,6 +517,17 @@ class CallController extends StateNotifier<CallState> {
   void _handleCallConnected(dynamic data) {
     Logger.d('CallController: call:connected received');
     _stopRingtone();
+
+    // For killed-state calls, we might not have received Agora config during call:incoming
+    // The backend provides it here again just in case
+    if (data['agora'] != null) {
+      _agoraToken = data['agora']['token'];
+      _agoraChannelId = data['agora']['channel'];
+      _agoraUid = data['agora']['uid'];
+      Logger.d('CallController: Receiver Agora config stored from call:connected');
+      _joinAgoraChannel();
+    }
+
     if (state.status != CallStatus.connected) {
       state = state.copyWith(status: CallStatus.connected);
     }
