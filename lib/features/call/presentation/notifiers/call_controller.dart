@@ -17,6 +17,8 @@ import '../../../../core/services/callkit_service.dart';
 import '../../../../app.dart' show navigatorKey;
 import '../../../../core/routing/route_names.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import '../../data/services/call_persistence_service.dart';
 
 enum CallStatus {
   idle,
@@ -38,6 +40,7 @@ class CallState {
   final bool isMuted;
   final bool isSpeakerOn;
   final String? currentUserId;
+  final DateTime? connectedAt; // Issue #2 Fix
 
   const CallState({
     this.status = CallStatus.idle,
@@ -48,6 +51,7 @@ class CallState {
     this.isMuted = false,
     this.isSpeakerOn = false,
     this.currentUserId,
+    this.connectedAt,
   });
 
   CallState copyWith({
@@ -59,6 +63,7 @@ class CallState {
     bool? isMuted,
     bool? isSpeakerOn,
     String? currentUserId,
+    DateTime? Function()? connectedAt, // Use function to allow null resets
   }) {
     return CallState(
       status: status ?? this.status,
@@ -69,6 +74,7 @@ class CallState {
       isMuted: isMuted ?? this.isMuted,
       isSpeakerOn: isSpeakerOn ?? this.isSpeakerOn,
       currentUserId: currentUserId ?? this.currentUserId,
+      connectedAt: connectedAt != null ? connectedAt() : this.connectedAt,
     );
   }
 }
@@ -88,15 +94,74 @@ class CallController extends StateNotifier<CallState> {
 
   Timer? _callTimeoutTimer;
   bool _isRinging = false;
+  bool _isProgrammaticallyEndingCallKit = false; // Issue #1 Fix
 
   // FIX ISSUE 5: Track subscriptions to prevent leaks/duplicates
   final List<StreamSubscription> _subscriptions = [];
 
   CallController(this._repository) : super(const CallState()) {
     _loadCurrentUserId();
+    _hydrateState(); // Issue #3 Fix: Hydrate state before listeners
     _setupSocketListeners();
     _setupAgoraListeners();
     _setupCallKitListeners();
+    _initializeNotifications();
+  }
+
+  final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+
+  Future<void> _initializeNotifications() async {
+    const android = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const darwin = DarwinInitializationSettings();
+    const settings = InitializationSettings(android: android, macOS: darwin, iOS: darwin);
+    await _localNotifications.initialize(
+      settings: settings,
+      onDidReceiveNotificationResponse: (response) {
+        // Issue #3: Redirect notification click to Active Call screen
+        if (state.status == CallStatus.connected || state.status == CallStatus.connecting) {
+           navigatorKey.currentState?.pushNamed(RouteNames.activeCall);
+        }
+      },
+    );
+  }
+
+  Future<void> _hydrateState() async {
+    final persisted = await CallPersistenceService.instance.loadCallState();
+    if (persisted != null && state.currentCall == null) {
+      Logger.d('CallController: Hydrating state from persistence: ${persisted['callId']}');
+
+      // Restore Agora config
+      _agoraToken = persisted['agoraToken'];
+      _agoraChannelId = persisted['agoraChannel'];
+      _agoraUid = persisted['agoraUid'];
+
+      final call = CallEntity(
+        id: persisted['callId'],
+        callerId: persisted['isCaller'] ? (_currentUserId ?? '') : 'incoming',
+        receiverId: persisted['isCaller'] ? 'receiver' : (_currentUserId ?? ''),
+        callerName: persisted['callerName'],
+        status: persisted['connectedAt'] != null ? 'connected' : 'ringing',
+        startTime: persisted['connectedAt'] ?? DateTime.now(),
+      );
+
+      state = state.copyWith(
+        currentCall: call,
+        isCaller: persisted['isCaller'],
+        status: persisted['connectedAt'] != null ? CallStatus.connected : CallStatus.ringing,
+        connectedAt: () => persisted['connectedAt'],
+      );
+
+      // Auto-navigate if hydrated as active or ringing
+      Future.microtask(() {
+        if (navigatorKey.currentState != null) {
+          if (state.status == CallStatus.connected) {
+             navigatorKey.currentState?.pushNamed(RouteNames.activeCall);
+          } else if (state.status == CallStatus.ringing && !state.isCaller) {
+             navigatorKey.currentState?.pushNamed(RouteNames.incomingCall);
+          }
+        }
+      });
+    }
   }
 
   Future<void> _loadCurrentUserId() async {
@@ -158,7 +223,10 @@ class CallController extends StateNotifier<CallState> {
     _subscriptions.add(_agoraService.remoteUserJoined.listen((uid) {
       Logger.d('CallController: Remote user joined Agora: $uid');
       if (state.status != CallStatus.connected) {
-        state = state.copyWith(status: CallStatus.connected);
+        state = state.copyWith(
+          status: CallStatus.connected,
+          connectedAt: () => state.connectedAt ?? DateTime.now(),
+        );
       }
     }));
 
@@ -232,7 +300,12 @@ class CallController extends StateNotifier<CallState> {
         break;
       case Event.actionCallEnded:
         Logger.d('CallController: CallKit ended');
-        await endCall();
+        if (_isProgrammaticallyEndingCallKit) {
+           Logger.d('CallController: Ignoring native CallKit end event (Programmatic Termination)');
+           _isProgrammaticallyEndingCallKit = false; // Reset mask
+        } else {
+           await endCall();
+        }
         break;
       case Event.actionCallTimeout:
         Logger.d('CallController: CallKit timeout');
@@ -330,12 +403,30 @@ class CallController extends StateNotifier<CallState> {
     try {
       Logger.d('CallController: Answering call ${state.currentCall!.id}');
       await _stopRingtone();
-      // DO NOT call CallKitService.instance.endAllCalls() here, otherwise it triggers actionCallEnded
-      // which immediately hangs up the call! CallKit implicitly goes to active state when answered.
+
+      // Issue #1 & #2 Guard:
+      // Silencing CallKit can sometimes cause a lifecycle cycle.
+      // We use the mask and a slight delay for endAllCalls.
+      _isProgrammaticallyEndingCallKit = true;
+      Future.delayed(const Duration(milliseconds: 500), () {
+         CallKitService.instance.endAllCalls();
+      });
 
       state = state.copyWith(status: CallStatus.connecting);
       await _repository.answerCall(state.currentCall!.id);
 
+      // Persist state
+      await CallPersistenceService.instance.saveCallState(
+        callId: state.currentCall!.id,
+        connectedAt: DateTime.now(),
+        isCaller: false,
+        callerName: state.currentCall!.callerName,
+        agoraToken: _agoraToken,
+        agoraChannel: _agoraChannelId,
+        agoraUid: _agoraUid,
+      );
+
+      _showOngoingNotification();
       await _joinAgoraChannel();
     } catch (e) {
       Logger.e('Error answering call', e);
@@ -436,6 +527,17 @@ class CallController extends StateNotifier<CallState> {
       currentCall: call,
       isCaller: false,
     );
+    // Persist for killed-state recovery (especially if this was via FCM stream while foreground)
+    CallPersistenceService.instance.saveCallState(
+      callId: incomingCallId,
+      connectedAt: null,
+      isCaller: false,
+      callerName: callerName,
+      agoraToken: _agoraToken,
+      agoraChannel: _agoraChannelId,
+      agoraUid: _agoraUid,
+    );
+
     // We only play the FlutterRingtone fallback if the CallKit Native UI isn't expected to handle it.
     // CallKit will play the system_ringtone_default directly.
     // If the device is iOS or CallKit triggers correctly, playing both causes echo/crashes.
@@ -510,7 +612,21 @@ class CallController extends StateNotifier<CallState> {
     }
 
     _stopRingtone();
-    state = state.copyWith(status: CallStatus.connecting);
+    state = state.copyWith(status: CallStatus.connecting, connectedAt: () => DateTime.now());
+
+    if (state.currentCall != null) {
+       CallPersistenceService.instance.saveCallState(
+          callId: state.currentCall!.id,
+          connectedAt: state.connectedAt,
+          isCaller: true,
+          callerName: state.currentCall!.receiverName,
+          agoraToken: _agoraToken,
+          agoraChannel: _agoraChannelId,
+          agoraUid: _agoraUid,
+        );
+    }
+
+    _showOngoingNotification();
     _joinAgoraChannel();
   }
 
@@ -529,7 +645,24 @@ class CallController extends StateNotifier<CallState> {
     }
 
     if (state.status != CallStatus.connected) {
-      state = state.copyWith(status: CallStatus.connected);
+      state = state.copyWith(
+        status: CallStatus.connected,
+        connectedAt: () => state.connectedAt ?? DateTime.now(),
+      );
+
+      // Persist state for killed-state recovery
+      if (state.currentCall != null) {
+        CallPersistenceService.instance.saveCallState(
+          callId: state.currentCall!.id,
+          connectedAt: state.connectedAt,
+          isCaller: state.isCaller,
+          callerName: state.isCaller ? state.currentCall!.receiverName : state.currentCall!.callerName,
+          agoraToken: _agoraToken,
+          agoraChannel: _agoraChannelId,
+          agoraUid: _agoraUid,
+        );
+      }
+      _showOngoingNotification();
     }
   }
 
@@ -614,6 +747,28 @@ class CallController extends StateNotifier<CallState> {
 
   // ─── Reset ───────────────────────────────────────────────────────────────────
 
+  Future<void> _showOngoingNotification() async {
+    const android = AndroidNotificationDetails(
+      'ongoing_calls',
+      'Ongoing Calls',
+      channelDescription: 'Notifications for active calls',
+      importance: Importance.max,
+      priority: Priority.high,
+      ongoing: true,
+      autoCancel: false,
+      showWhen: true,
+      usesChronometer: true,
+      category: AndroidNotificationCategory.call,
+    );
+    const platform = NotificationDetails(android: android);
+    await _localNotifications.show(
+      id: 888,
+      title: 'Ongoing Call',
+      body: 'Tap to return to call',
+      notificationDetails: platform,
+    );
+  }
+
   Future<void> _resetCall() async {
     _stopCallTimeout();
     _isRinging = false;
@@ -621,6 +776,8 @@ class CallController extends StateNotifier<CallState> {
     await _stopRingtone();
     await CallKitService.instance.endAllCalls();
     await _agoraService.leaveChannel();
+    await CallPersistenceService.instance.clearCallState();
+    await _localNotifications.cancel(id: 888);
 
     _receiverId = null;
     _agoraToken = null;
@@ -633,6 +790,7 @@ class CallController extends StateNotifier<CallState> {
       status: CallStatus.idle,
       isMuted: false,
       isSpeakerOn: false,
+      connectedAt: () => null, // Explicitly reset to null
     );
   }
 
@@ -657,6 +815,7 @@ class CallController extends StateNotifier<CallState> {
   // FIX ISSUE 5: Cancel all subscriptions on dispose
   @override
   void dispose() {
+    _callTimeoutTimer?.cancel();
     Logger.d('CallController: Disposing and canceling ${_subscriptions.length} subscriptions');
     for (var sub in _subscriptions) {
       sub.cancel();

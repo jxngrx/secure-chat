@@ -3,6 +3,7 @@ import '../../domain/repositories/call_repository.dart';
 import '../../domain/entities/call_entity.dart';
 import '../datasources/call_remote_ds.dart';
 import '../datasources/call_socket_ds.dart';
+import '../../../../core/utils/logger.dart';
 
 class CallRepositoryImpl implements CallRepository {
   // FIXED: Use a factory constructor so the singleton ALSO calls _initSocketListeners
@@ -74,7 +75,18 @@ class CallRepositoryImpl implements CallRepository {
 
   @override
   Future<void> answerCall(String callId) async {
+    // 1. Emit purely via WebSocket (good for fast, foreground active connections)
     _socketDS.answerCall(callId);
+
+    // 2. Guarantee Backend sync via REST fallback for Killed-State Cold Starts.
+    // When waking from a killed state, the socket might not be fully authenticated yet
+    // before this method is invoked by the native CallKit callback!
+    try {
+      await _remoteDS.answerCall(callId);
+      Logger.d('CallRepositoryImpl: REST Fallback answerCall succeeded for $callId');
+    } catch (e) {
+      Logger.w('CallRepositoryImpl: REST Fallback answerCall failed (expected if active): $e');
+    }
   }
 
   @override

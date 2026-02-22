@@ -70,6 +70,7 @@ class _AppState extends State<App> with WidgetsBindingObserver {
       themeMode: ThemeMode.system,
       onGenerateRoute: AppRouter.generateRoute,
       initialRoute: RouteNames.splash,
+      navigatorObservers: [AppRouter.routeObserver],
       builder: (context, child) {
         return CallGlobalListener(child: child!);
       },

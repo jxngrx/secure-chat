@@ -22,11 +22,33 @@ import '../../features/call/presentation/screens/incoming_call_screen.dart';
 import '../../features/call/presentation/screens/outgoing_call_screen.dart';
 import '../../features/call/presentation/screens/active_call_screen.dart';
 
+class AppRouteObserver extends NavigatorObserver {
+  final ValueNotifier<String?> currentRoute = ValueNotifier<String?>(null);
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    currentRoute.value = route.settings.name;
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    currentRoute.value = previousRoute?.settings.name;
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    currentRoute.value = newRoute?.settings.name;
+  }
+}
+
 class AppRouter {
   AppRouter._();
 
+  static final AppRouteObserver routeObserver = AppRouteObserver();
+
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
+      case '/':
       case RouteNames.splash:
         return MaterialPageRoute(
           builder: (_) => const SplashScreen(),

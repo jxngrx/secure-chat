@@ -10,6 +10,7 @@ import '../../core/routing/route_names.dart';
 import '../../app.dart' show navigatorKey;
 import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'callkit_service.dart';
+import '../../features/call/data/services/call_persistence_service.dart';
 
 /// Top-level function to handle background messages
 /// Must be a top-level function (not a class method)
@@ -40,6 +41,17 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       callerId: data['callerId'] ?? 'unknown',
       avatar: data['callerAvatar'],
       hasVideo: data['isVideo'] == 'true',
+    );
+
+    // Issue #3 persistence: Save state in background so main app can hydrate instantly
+    await CallPersistenceService.instance.saveCallState(
+      callId: callId,
+      connectedAt: null, // Still ringing
+      isCaller: false,
+      callerName: data['callerName'],
+      agoraToken: data['agoraToken'],
+      agoraChannel: data['agoraChannel'],
+      agoraUid: data['agoraUid'],
     );
   }
 }

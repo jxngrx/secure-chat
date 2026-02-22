@@ -16,7 +16,6 @@ class ActiveCallScreen extends ConsumerStatefulWidget {
 
 class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
   Timer? _timer;
-  int _secondsElapsed = 0;
 
   @override
   void initState() {
@@ -41,9 +40,7 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
     if (_timer != null) return;
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
-        setState(() {
-          _secondsElapsed++;
-        });
+        setState(() {}); // Simple rebuild to trigger getter re-evaluation
       }
     });
   }
@@ -60,51 +57,22 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
     final controller = ref.read(callControllerProvider.notifier);
     final call = controller.currentCall;
 
-    // Start timer if call just connected
-    if (callState.status == CallStatus.connected && _timer == null) {
-      _startTimer();
-    }
-
-    // Auto-close if call ended, rejected, errored, or reset to idle
-    if (callState.status == CallStatus.ended ||
-        callState.status == CallStatus.rejected ||
-        callState.status == CallStatus.error ||
-        callState.status == CallStatus.idle) {
-       WidgetsBinding.instance.addPostFrameCallback((_) {
+    // Handle terminal state UI navigation
+    ref.listen<CallStatus>(callControllerProvider.select((s) => s.status), (prev, next) {
+      if (next == CallStatus.ended || next == CallStatus.rejected || next == CallStatus.error || next == CallStatus.idle) {
+         _timer?.cancel();
+         _timer = null;
          if (mounted) {
-           if (Navigator.canPop(context)) {
-             Navigator.pop(context);
-           } else {
-             Navigator.pushReplacementNamed(context, RouteNames.chatList);
-           }
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              RouteNames.chatList,
+              (route) => false,
+            );
          }
-       });
-
-       String message = 'Call Ended';
-       if (callState.status == CallStatus.error) {
-         message = 'Connection Failed';
-       } else if (callState.status == CallStatus.rejected) {
-         message = 'Call Rejected';
-       }
-
-       return Scaffold(
-         backgroundColor: Colors.black,
-         body: Center(
-           child: Column(
-             mainAxisAlignment: MainAxisAlignment.center,
-             children: [
-               Icon(
-                 callState.status == CallStatus.error ? Icons.error_outline : Icons.call_end,
-                 color: Colors.white54,
-                 size: 64,
-               ),
-               const SizedBox(height: 16),
-               Text(message, style: const TextStyle(color: Colors.white, fontSize: 20)),
-             ],
-           ),
-         ),
-       );
-    }
+      } else if (next == CallStatus.connected && _timer == null) {
+         _startTimer();
+      }
+    });
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -193,9 +161,20 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
                     builder: (context) {
                       final currentUserId = callState.currentUserId;
                       final isOutgoing = call?.callerId == currentUserId;
-                      final otherName = isOutgoing
-                          ? (call?.receiverName ?? 'User ${call?.receiverId.substring(call.receiverId.length > 5 ? call.receiverId.length - 5 : 0)}')
-                          : (call?.callerName ?? 'User ${call?.callerId.substring(call.callerId.length > 5 ? call.callerId.length - 5 : 0)}');
+
+                      // Safely compute the display name to avoid null-check crashes during Killed-State intent hydration
+                      String otherName = 'Connecting...';
+                      if (call != null) {
+                         if (isOutgoing) {
+                            final rawId = call.receiverId;
+                            final shortId = rawId.length > 5 ? rawId.substring(rawId.length - 5) : rawId;
+                            otherName = call.receiverName ?? 'User $shortId';
+                         } else {
+                            final rawId = call.callerId;
+                            final shortId = rawId.length > 5 ? rawId.substring(rawId.length - 5) : rawId;
+                            otherName = call.callerName ?? 'User $shortId';
+                         }
+                      }
 
                       return Text(
                         otherName,
@@ -217,21 +196,29 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(
-                      callState.status == CallStatus.connected
-                        ? _formatDuration(_secondsElapsed)
-                        : callState.status == CallStatus.connecting
-                            ? 'Connecting...'
-                            : 'Dialing...',
-                      style: TextStyle(
-                        color: callState.status == CallStatus.connected
-                            ? AppColors.primary
-                            : Colors.white54,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 1.2,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
+                    child: Builder(
+                      builder: (context) {
+                        int seconds = 0;
+                        if (callState.connectedAt != null) {
+                           seconds = DateTime.now().difference(callState.connectedAt!).inSeconds;
+                        }
+                        return Text(
+                          callState.status == CallStatus.connected
+                            ? _formatDuration(seconds)
+                            : callState.status == CallStatus.connecting
+                                ? 'Connecting...'
+                                : 'Dialing...',
+                          style: TextStyle(
+                            color: callState.status == CallStatus.connected
+                                ? AppColors.primary
+                                : Colors.white54,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 1.2,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        );
+                      }
                     ),
                   ),
                 ],
@@ -267,7 +254,13 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
                     GestureDetector(
                       onTap: () async {
                         await controller.endCall();
-                        if (mounted) Navigator.pop(context);
+                        if (mounted) {
+                          Navigator.pushNamedAndRemoveUntil(
+                            context,
+                            RouteNames.chatList,
+                            (route) => false,
+                          );
+                        }
                       },
                       child: Container(
                         width: 64,
